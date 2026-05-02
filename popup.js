@@ -48,6 +48,8 @@ const clipStatusText = document.getElementById("clip-status-text");
 
 const importText = document.getElementById("import-text");
 const importCount = document.getElementById("import-count");
+const importTripSelect = document.getElementById("import-trip-select");
+const importLoadTripsButton = document.getElementById("import-load-trips-button");
 const importTripInput = document.getElementById("import-trip-input");
 const importTargetType = document.getElementById("import-target-type");
 const importTargetInput = document.getElementById("import-target-input");
@@ -88,7 +90,7 @@ clipText.addEventListener("input", () => {
 });
 
 loadTripsButton.addEventListener("click", () => {
-  loadWanderlogTrips();
+  loadAndPopulateTripSelects({ userInitiated: true });
 });
 
 clipTripSelect.addEventListener("change", () => {
@@ -124,6 +126,14 @@ parseImportButton.addEventListener("click", () => {
 
 checkImportButton.addEventListener("click", () => {
   checkImportMatches();
+});
+
+importLoadTripsButton.addEventListener("click", () => {
+  loadAndPopulateTripSelects({ userInitiated: true });
+});
+
+importTripSelect.addEventListener("change", () => {
+  sendImportButton.disabled = !importTripSelect.value;
 });
 
 sendImportButton.addEventListener("click", () => {
@@ -217,6 +227,8 @@ async function init() {
   await loadPendingClip();
   renderImportPreview();
   renderEntries(await getEntries());
+  // Populate trip selects in the background — don't block the popup from rendering.
+  loadAndPopulateTripSelects({ userInitiated: false }).catch(() => {});
 }
 
 async function getPageContext(tab) {
@@ -739,10 +751,15 @@ function getSuccessMessage(kind, result) {
     : "Opened Wanderlog on this page.";
 }
 
-async function loadWanderlogTrips() {
+async function loadAndPopulateTripSelects({ userInitiated }) {
   loadTripsButton.disabled = true;
+  importLoadTripsButton.disabled = true;
   clipTripSelect.disabled = true;
-  clipStatusText.textContent = "Loading your Wanderlog trips...";
+
+  if (userInitiated) {
+    clipStatusText.textContent = "Loading your Wanderlog trips...";
+    importStatusText.textContent = "Loading your Wanderlog trips...";
+  }
 
   try {
     const response = await chrome.runtime.sendMessage({ type: "GET_WANDERLOG_TRIPS" });
@@ -752,18 +769,37 @@ async function loadWanderlogTrips() {
     }
 
     const trips = response.trips || [];
-    clipTripSelect.innerHTML =
+    const options =
       '<option value="">— select a trip —</option>' +
       trips.map((t) => `<option value="${escapeHtml(t.id)}">${escapeHtml(t.name)}</option>`).join("");
 
+    clipTripSelect.innerHTML = options;
     clipTripSelect.disabled = false;
     sendToWanderlogButton.disabled = true;
-    clipStatusText.textContent = `${trips.length} trip${trips.length === 1 ? "" : "s"} loaded. Pick one to send the note directly.`;
+
+    importTripSelect.innerHTML = options;
+    // Re-evaluate send button state based on current selection.
+    sendImportButton.disabled = !importTripSelect.value;
+
+    if (userInitiated) {
+      const label = `${trips.length} trip${trips.length === 1 ? "" : "s"} loaded.`;
+      clipStatusText.textContent = `${label} Pick one to send the note directly.`;
+      importStatusText.textContent = `${label} Select a trip, then click Send to Wanderlog.`;
+    }
   } catch (error) {
-    clipTripSelect.innerHTML = '<option value="">— could not load trips —</option>';
-    clipStatusText.textContent = error.message || "Could not load trips.";
+    const placeholder = '<option value="">— could not load trips —</option>';
+    clipTripSelect.innerHTML = placeholder;
+    importTripSelect.innerHTML = placeholder;
+
+    if (userInitiated) {
+      const msg = error.message || "Could not load trips.";
+      clipStatusText.textContent = msg;
+      importStatusText.textContent = msg;
+    }
   } finally {
     loadTripsButton.disabled = false;
+    importLoadTripsButton.disabled = false;
+    clipTripSelect.disabled = false;
   }
 }
 
@@ -819,9 +855,9 @@ async function sendClipToWanderlog() {
 }
 
 async function sendImportToWanderlog() {
-  const tripId = importTripInput.value.trim();
+  const tripId = importTripSelect.value;
   if (!tripId) {
-    importStatusText.textContent = "Enter a trip name or ID to send destinations directly.";
+    importStatusText.textContent = "Select a trip from the dropdown first.";
     return;
   }
 
@@ -830,25 +866,23 @@ async function sendImportToWanderlog() {
   );
 
   if (!usableItems.length) {
-    importStatusText.textContent = "Preview at least one usable destination first.";
+    importStatusText.textContent = "Preview at least one destination first.";
     return;
   }
 
-  const matchedItems = usableItems.filter((item) => item.geoId);
-  if (!matchedItems.length) {
-    importStatusText.textContent = 'Run "Check matches" first so destinations have Wanderlog geo IDs.';
-    return;
-  }
-
+  const tripName = importTripSelect.options[importTripSelect.selectedIndex]?.text || tripId;
   setImportButtonsDisabled(true);
-  importStatusText.textContent = `Sending ${matchedItems.length} destination${matchedItems.length === 1 ? "" : "s"} to Wanderlog...`;
+  importStatusText.textContent = `Sending ${usableItems.length} place${usableItems.length === 1 ? "" : "s"} to "${tripName}"…`;
 
   try {
     const response = await chrome.runtime.sendMessage({
       type: "WANDERLOG_SEND_DESTINATIONS",
       payload: {
         tripId,
-        items: matchedItems.map((item) => ({ geoId: item.geoId, name: item.matchedName || item.name }))
+        items: usableItems.map((item) => ({
+          geoId: item.geoId || null,
+          name: item.matchedName || item.name
+        }))
       }
     });
 
@@ -860,8 +894,15 @@ async function sendImportToWanderlog() {
     const added = result.added?.length || 0;
     const failed = result.failed?.length || 0;
     importStatusText.textContent =
-      `Sent ${added} destination${added === 1 ? "" : "s"} to Wanderlog` +
-      (failed > 0 ? `, ${failed} failed.` : ".");
+      `Added ${added} place${added === 1 ? "" : "s"} to "${tripName}"` +
+      (failed > 0 ? ` — ${failed} could not be added.` : ".");
+
+    const data = await chrome.storage.local.get(RECENT_TRIPS_KEY);
+    const recentTrips = Array.isArray(data[RECENT_TRIPS_KEY]) ? data[RECENT_TRIPS_KEY] : [];
+    await chrome.storage.local.set({
+      [RECENT_TRIPS_KEY]: addRecentTrip(recentTrips, tripName)
+    });
+
     renderEntries(await getEntries());
   } catch (error) {
     importStatusText.textContent = error.message || "Could not send destinations.";

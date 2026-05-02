@@ -116,12 +116,21 @@
           placeholder="Senso-ji&#10;Meiji Shrine&#10;Shibuya Sky&#10;Tsukiji Outer Market"
         ></textarea>
         <div class="form-grid">
+          <label class="wide-field">
+            <span class="label">Add to trip</span>
+            <div class="trip-select-row">
+              <select id="import-trip-select">
+                <option value="">— loading trips… —</option>
+              </select>
+              <button id="import-load-trips-button" class="secondary-button" type="button">Reload</button>
+            </div>
+          </label>
           <label>
-            <span class="label">Trip</span>
+            <span class="label">Local label (optional)</span>
             <input id="import-trip-input" list="recent-trip-list" type="text" placeholder="E.g. Japan 2026" />
           </label>
           <label>
-            <span class="label">Target</span>
+            <span class="label">Target section</span>
             <select id="import-target-type">
               <option value="Trip itinerary">Trip itinerary</option>
               <option value="Day">Day</option>
