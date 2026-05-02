@@ -5,7 +5,7 @@
 # Wanderlog Notes Clipper
 
 [![CI](https://github.com/rosemontni/extension/actions/workflows/ci.yml/badge.svg)](https://github.com/rosemontni/extension/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-0.4.0-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.5.0-blue.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-Apache--2.0-green.svg)](LICENSE)
 [![Manifest V3](https://img.shields.io/badge/Chrome-Manifest%20V3-f6a03d.svg)](manifest.json)
 

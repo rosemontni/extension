@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.5.0 - 2026-05-02
+
+- Removed Save locally from both the clip card and bulk importer — it stored data with no follow-up action and has been replaced by Send to Wanderlog as the primary path and Copy as the manual fallback.
+- Fixed trip loading: the fetch interceptor now clones successful GET responses to cache actual trip data, and the page script scrapes trip links from Wanderlog's sidebar DOM on load. Trips no longer require guessing undocumented API endpoints.
+- Fixed trip selects staying stuck on "loading trips…" when loading fails — selects now show an actionable error placeholder and the status text is always updated.
+- Fixed `importTripSelect` not being re-enabled after a failed load.
+- Sent imports are now recorded in Recent activity (previously only clips were).
+- Added Prerequisites for Direct Write section to README with a feature table clarifying which actions require visiting app.wanderlog.com first.
+- Corrected README claim that the extension opens a Wanderlog tab automatically when none is present.
+
 ## v0.4.0 - 2026-05-02
 
 - Added direct write to Wanderlog trips: notes and bulk destination lists are now sent straight into a selected trip without any copy-paste handoff.
