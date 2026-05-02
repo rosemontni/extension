@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.4.0 - 2026-05-02
+
+- Added direct write to Wanderlog trips: notes and bulk destination lists are now sent straight into a selected trip without any copy-paste handoff.
+- Added `wanderlog-app.js` content script on `app.wanderlog.com` that intercepts the Wanderlog web app's own fetch calls to discover internal API endpoints, stores discovered patterns locally, and proxies authenticated same-origin write requests from the extension.
+- Added trip selector dropdowns (clip card and bulk importer) that auto-populate when the popup opens by fetching the user's trips from Wanderlog.
+- Added **Send to Wanderlog** as the primary action for both note clips and bulk destination imports; **Save locally** and **Copy** remain available as fallbacks.
+- Bulk destination importer now sends all previewed places to the selected trip's places in one click, without requiring a prior geo match check.
+- Background service worker gains `GET_WANDERLOG_TRIPS`, `WANDERLOG_SEND_CLIP`, and `WANDERLOG_SEND_DESTINATIONS` message handlers with a content script proxy fallback.
+
 ## v0.3.0 - 2026-05-02
 
 - Added a bulk destination-list importer with one-place-per-line parsing, bullet/number cleanup, preview, remove/uncheck controls, duplicate warnings, and local import storage.
