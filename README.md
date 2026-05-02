@@ -34,9 +34,26 @@ The promotional banner in `assets/wanderlog-notes-banner.png` was generated with
 4. Click **Load unpacked**.
 5. Select the unzipped extension folder.
 
+## Prerequisites for Direct Write
+
+Most extension features work immediately after install. **Sending notes or places directly into a Wanderlog trip** requires one extra step: open [app.wanderlog.com](https://app.wanderlog.com) and navigate to any trip before using the Send to Wanderlog button.
+
+| Feature | Requires visiting app.wanderlog.com |
+|---|---|
+| Save a place (panel / map) | No |
+| Add as destination | No |
+| Clip text → Save locally | No |
+| Clip text → Copy note | No |
+| Bulk import → Save locally | No |
+| Bulk import → Copy list | No |
+| **Clip text → Send to Wanderlog** | **Yes — once per session** |
+| **Bulk import → Send to Wanderlog** | **Yes — once per session** |
+
+Once you have visited a Wanderlog trip page, the extension caches your trip list. It stays fresh for 10 minutes and is repopulated automatically each time you browse Wanderlog. Use the **Reload** button in the popup if the list looks stale.
+
 ## Sending Notes Directly to a Trip
 
-When the popup opens, the extension automatically fetches your Wanderlog trips and pre-populates the trip selector. No extra steps needed — just pick a trip and send.
+After visiting app.wanderlog.com, the popup pre-populates the trip selector automatically. Pick a trip and send.
 
 **For a selected-text note:**
 
@@ -62,7 +79,9 @@ Wanderlog does not publish a write API. This extension discovers Wanderlog's int
 
 When you click **Send to Wanderlog**, the extension routes the request through that content script, which makes same-origin authenticated calls using the same session Wanderlog already holds. No credentials are stored or transmitted outside your browser.
 
-If no Wanderlog tab is open, the extension opens one and routes through it. If the write fails (the internal API may change between Wanderlog releases), **Save locally** and **Copy** fallbacks are always available.
+Trip data is read in three ways, in order: from a local cache populated the last time you browsed Wanderlog, from the live page state and sidebar DOM of any open Wanderlog tab, and by proxying a request through an open tab if the cache is stale. If none of those paths succeed, the extension tells you to open Wanderlog first rather than failing silently.
+
+If a write fails (the internal API may change between Wanderlog releases), **Save locally** and **Copy** fallbacks are always available.
 
 ## Development
 
