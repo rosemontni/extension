@@ -36,7 +36,7 @@
         <header class="hero">
           <p class="eyebrow">Wanderlog</p>
           <h1>Save to trip</h1>
-          <p class="subtitle">Turn highlighted travel details into a clean trip note.</p>
+          <p class="subtitle">Send highlighted travel details directly into a Wanderlog trip.</p>
         </header>
 
         <section class="card">
@@ -59,9 +59,15 @@
             <a id="clip-source-url" href="#">https://example.com/lisbon-markets</a>
           </div>
           <div class="form-grid">
-            <label>
-              <span class="label">Trip</span>
-              <input id="clip-trip-input" type="text" value="Portugal 2026" />
+            <label class="wide-field">
+              <span class="label">Send to trip</span>
+              <div class="trip-select-row">
+                <select id="clip-trip-select">
+                  <option value="pt26" selected>Portugal 2026</option>
+                  <option value="es27">Spain 2027</option>
+                </select>
+                <button class="secondary-button" type="button">Load trips</button>
+              </div>
             </label>
             <label>
               <span class="label">Note type</span>
@@ -79,18 +85,25 @@
               <span class="label">Optional label</span>
               <input id="clip-target-input" type="text" value="Time Out Market" />
             </label>
+            <label>
+              <span class="label">Trip label (local)</span>
+              <input id="clip-trip-input" type="text" value="Portugal 2026" />
+            </label>
           </div>
           <label class="checkbox-row">
             <input id="clip-include-source" type="checkbox" checked />
             <span>Include source URL</span>
           </label>
           <div class="actions">
-            <div class="button-row three-up">
-              <button id="save-clip-button" type="button">Save clip</button>
+            <div class="button-row">
+              <button id="send-to-wanderlog-button" type="button">Send to Wanderlog</button>
               <button id="copy-note-button" class="secondary-button" type="button">Copy note</button>
+            </div>
+            <div class="button-row single">
               <button id="open-wanderlog-button" class="secondary-button" type="button">Open Wanderlog</button>
             </div>
-            <span id="clip-status-text" class="status">Saved locally, copied for Wanderlog paste, or opened in Wanderlog.</span>
+            <button id="cancel-clip-button" class="link-button" type="button">Cancel clip</button>
+            <span id="clip-status-text" class="status">Note sent to "Portugal 2026".</span>
           </div>
         </section>
 

@@ -22,9 +22,9 @@ The promotional banner in `assets/wanderlog-notes-banner.png` was generated with
 - **Direct trip write** — select a trip from a pre-populated dropdown and send notes or places straight into Wanderlog without leaving the page.
 - **Save a place** by opening Wanderlog's authenticated save/search panel for the active tab.
 - **Add a destination** by resolving highlighted text through Wanderlog geo autocomplete, then opening Wanderlog's trip creation flow with the destination pre-selected.
-- **Clip selected text** — right-click any highlighted travel text, review and edit the note, choose a note type and target, then send it directly to a trip or save it locally.
+- **Clip selected text** — right-click any highlighted travel text, review and edit the note, choose a note type and target, then send it directly to a trip or copy it for a manual paste.
 - **Bulk destination importer** — paste a list of places (one per line), preview the cleaned entries, optionally check Wanderlog geo matches, then send them all to a trip in one click.
-- **Recent activity log** — quick local recall of saved notes, imports, and place searches.
+- **Recent activity log** — quick local recall of sent notes, imports, and place searches.
 
 ## Install Locally
 
@@ -42,9 +42,7 @@ Most extension features work immediately after install. **Sending notes or place
 |---|---|
 | Save a place (panel / map) | No |
 | Add as destination | No |
-| Clip text → Save locally | No |
 | Clip text → Copy note | No |
-| Bulk import → Save locally | No |
 | Bulk import → Copy list | No |
 | **Clip text → Send to Wanderlog** | **Yes — once per session** |
 | **Bulk import → Send to Wanderlog** | **Yes — once per session** |
@@ -62,7 +60,7 @@ After visiting app.wanderlog.com, the popup pre-populates the trip selector auto
 3. Review and edit the note in the popup.
 4. Choose a note type and optional target label.
 5. The trip selector is already populated — pick a trip and click **Send to Wanderlog**.
-6. Use **Save locally** or **Copy note** if you prefer a manual handoff.
+6. Use **Copy note** if you prefer to paste it into Wanderlog manually.
 
 **For a bulk destination list:**
 
@@ -71,7 +69,7 @@ After visiting app.wanderlog.com, the popup pre-populates the trip selector auto
 3. Optionally click **Check matches** to verify Wanderlog geo coverage before sending.
 4. Pick a trip from the pre-populated dropdown.
 5. Click **Send to Wanderlog** — all previewed places are added to that trip's places directly.
-6. Use **Save locally** or **Copy list** as a fallback if needed.
+6. Use **Copy list** if you prefer to paste the destinations into Wanderlog manually.
 
 ## How Direct Write Works
 
@@ -81,7 +79,7 @@ When you click **Send to Wanderlog**, the extension routes the request through t
 
 Trip data is read in three ways, in order: from a local cache populated the last time you browsed Wanderlog, from the live page state and sidebar DOM of any open Wanderlog tab, and by proxying a request through an open tab if the cache is stale. If none of those paths succeed, the extension tells you to open Wanderlog first rather than failing silently.
 
-If a write fails (the internal API may change between Wanderlog releases), **Save locally** and **Copy** fallbacks are always available.
+If a write fails (the internal API may change between Wanderlog releases), **Copy** is always available as a manual fallback.
 
 ## Development
 
@@ -91,7 +89,7 @@ npm test
 
 The check script validates the Manifest V3 metadata, required files, permissions, host permissions, version alignment, and JavaScript syntax across all extension scripts.
 
-CI runs the same validation on pushes to `main` and pull requests. The release workflow packages version tags like `v0.4.0` into a ZIP and uploads it to GitHub Releases.
+CI runs the same validation on pushes to `main` and pull requests. The release workflow packages version tags like `v0.5.0` into a ZIP and uploads it to GitHub Releases.
 
 ## Release Standard
 

@@ -32,7 +32,7 @@
         <header class="hero">
           <p class="eyebrow">Wanderlog</p>
           <h1>Import destinations</h1>
-          <p class="subtitle">Clean, dedupe, and prepare a pasted trip list.</p>
+          <p class="subtitle">Clean, dedupe, and send a pasted trip list directly into Wanderlog.</p>
         </header>
 
         <section class="card">
@@ -49,19 +49,15 @@
 2) Senso ji
 [ ] Tsukiji Outer Market</textarea>
           <div class="form-grid">
-            <label>
-              <span class="label">Trip</span>
-              <input type="text" value="Japan 2026" />
-            </label>
-            <label>
-              <span class="label">Target</span>
-              <select>
-                <option selected>Trip itinerary</option>
-              </select>
-            </label>
             <label class="wide-field">
-              <span class="label">Optional target label</span>
-              <input type="text" value="Tokyo planning list" />
+              <span class="label">Send to trip</span>
+              <div class="trip-select-row">
+                <select id="import-trip-select">
+                  <option value="jp26" selected>Japan 2026</option>
+                  <option value="kr27">Korea 2027</option>
+                </select>
+                <button class="secondary-button" type="button">Reload</button>
+              </div>
             </label>
           </div>
           <div class="actions">
@@ -101,12 +97,14 @@
                 <p class="import-meta">Duplicate in pasted list</p>
               </li>
             </ul>
-            <div class="button-row three-up">
-              <button type="button">Save import</button>
+            <div class="button-row">
+              <button type="button">Send to Wanderlog</button>
               <button class="secondary-button" type="button">Copy list</button>
+            </div>
+            <div class="button-row single">
               <button class="secondary-button" type="button">Open Wanderlog</button>
             </div>
-            <span class="status">Match check done: 4 matched, 0 unmatched, 0 failed.</span>
+            <span class="status">4 destinations sent to "Japan 2026".</span>
           </div>
         </section>
       </main>
