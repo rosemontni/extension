@@ -1,8 +1,11 @@
 const STORAGE_KEY = "wanderlogSearches";
+const PENDING_CLIP_KEY = "wanderlogPendingClip";
 const PLACE_MENU_ID = "wanderlog-save-place";
 const DESTINATION_MENU_ID = "wanderlog-add-destination";
+const CLIP_MENU_ID = "wanderlog-save-selected-text";
 const WANDERLOG_APP_URL = "https://app.wanderlog.com";
 const WANDERLOG_MAP_URL = "https://extensionembed.wanderlog.com/extension/map";
+const MAX_CLIP_TEXT_LENGTH = 2000;
 
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.removeAll(() => {
@@ -16,6 +19,12 @@ chrome.runtime.onInstalled.addListener(() => {
       id: DESTINATION_MENU_ID,
       title: "Add to Wanderlog as destination",
       contexts: ["page", "selection"]
+    });
+
+    chrome.contextMenus.create({
+      id: CLIP_MENU_ID,
+      title: "Save selected text to Wanderlog",
+      contexts: ["selection"]
     });
   });
 });
@@ -35,6 +44,8 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     await openWanderlogForTab(tab.id, search, tab.url || "");
   } else if (info.menuItemId === DESTINATION_MENU_ID) {
     await openWanderlogDestination(search, tab.url || "");
+  } else if (info.menuItemId === CLIP_MENU_ID) {
+    await captureSelectedTextClip(info, tab);
   }
 });
 
@@ -57,6 +68,47 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
   return undefined;
 });
+
+async function captureSelectedTextClip(info, tab) {
+  const selectedText = normalizeClipText(info.selectionText);
+  if (!selectedText) {
+    throw new Error("Highlight text before saving a Wanderlog note.");
+  }
+
+  if (selectedText.length > MAX_CLIP_TEXT_LENGTH) {
+    throw new Error(`Selected text is too long. Keep clips under ${MAX_CLIP_TEXT_LENGTH} characters.`);
+  }
+
+  const sourceUrl = tab.url || info.pageUrl || "";
+  const clip = {
+    id: crypto.randomUUID(),
+    selectedText,
+    sourceTitle: tab.title || "Untitled page",
+    sourceUrl,
+    domain: getDomain(sourceUrl),
+    capturedAt: new Date().toISOString(),
+    status: "draft"
+  };
+
+  await chrome.storage.local.set({ [PENDING_CLIP_KEY]: clip });
+  await openClipPopup();
+}
+
+async function openClipPopup() {
+  if (chrome.action.openPopup) {
+    try {
+      await chrome.action.openPopup();
+      return;
+    } catch (_error) {
+      // Chrome may reject openPopup in some contexts; use a focused extension tab.
+    }
+  }
+
+  await chrome.tabs.create({
+    url: chrome.runtime.getURL("popup.html?clip=1"),
+    active: true
+  });
+}
 
 async function openWanderlogDestination(search, sourceUrl) {
   const trimmedSearch = normalizeSearch(search);
@@ -167,6 +219,24 @@ function getSearchText({ selection, title, url }) {
 
 function normalizeSearch(value) {
   return String(value || "").replace(/\s+/g, " ").trim().slice(0, 200);
+}
+
+function normalizeClipText(value) {
+  return String(value || "")
+    .replace(/\r\n/g, "\n")
+    .split("\n")
+    .map((line) => line.trim())
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function getDomain(url) {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch (_error) {
+    return "";
+  }
 }
 
 function buildWanderlogMapUrl(search) {

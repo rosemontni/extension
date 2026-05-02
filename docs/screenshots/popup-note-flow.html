@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Wanderlog Notes Clipper screenshot</title>
+    <link rel="stylesheet" href="../../popup.css" />
+    <style>
+      body {
+        min-width: 0;
+        display: grid;
+        place-items: center;
+        min-height: 100vh;
+        padding: 40px;
+      }
+
+      .popup {
+        width: 420px;
+      }
+
+      .screenshot-shell {
+        border-radius: 28px;
+        padding: 12px;
+        background: rgba(255, 255, 255, 0.55);
+        box-shadow: 0 28px 80px rgba(28, 24, 16, 0.22);
+      }
+
+      #clip-card {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="screenshot-shell">
+      <main class="popup">
+        <header class="hero">
+          <p class="eyebrow">Wanderlog</p>
+          <h1>Save to trip</h1>
+          <p class="subtitle">Turn highlighted travel details into a clean trip note.</p>
+        </header>
+
+        <section class="card">
+          <p class="label">Current page</p>
+          <h2 id="page-title">Best food markets in Lisbon</h2>
+          <a id="page-url" href="#">https://example.com/lisbon-markets</a>
+          <div id="selection-box" class="selection">
+            Time Out Market is best before noon; go early for shorter lines and grab a seat first.
+          </div>
+        </section>
+
+        <section id="clip-card" class="card">
+          <div class="history-header">
+            <p class="label">Selected text note</p>
+            <span id="clip-length" class="pill">92</span>
+          </div>
+          <textarea id="clip-text" rows="5">Time Out Market is best before noon; go early for shorter lines and grab a seat first.</textarea>
+          <div class="source-block">
+            <p id="clip-source-title">Best food markets in Lisbon</p>
+            <a id="clip-source-url" href="#">https://example.com/lisbon-markets</a>
+          </div>
+          <div class="form-grid">
+            <label>
+              <span class="label">Trip</span>
+              <input id="clip-trip-input" type="text" value="Portugal 2026" />
+            </label>
+            <label>
+              <span class="label">Note type</span>
+              <select id="clip-note-type">
+                <option selected>Food</option>
+              </select>
+            </label>
+            <label>
+              <span class="label">Destination</span>
+              <select id="clip-destination-type">
+                <option selected>Attach to place</option>
+              </select>
+            </label>
+            <label>
+              <span class="label">Optional label</span>
+              <input id="clip-target-input" type="text" value="Time Out Market" />
+            </label>
+          </div>
+          <label class="checkbox-row">
+            <input id="clip-include-source" type="checkbox" checked />
+            <span>Include source URL</span>
+          </label>
+          <div class="actions">
+            <div class="button-row three-up">
+              <button id="save-clip-button" type="button">Save clip</button>
+              <button id="copy-note-button" class="secondary-button" type="button">Copy note</button>
+              <button id="open-wanderlog-button" class="secondary-button" type="button">Open Wanderlog</button>
+            </div>
+            <span id="clip-status-text" class="status">Saved locally, copied for Wanderlog paste, or opened in Wanderlog.</span>
+          </div>
+        </section>
+
+        <section class="card">
+          <label class="label" for="search-input">Place or destination</label>
+          <input id="search-input" type="text" value="Time Out Market Lisbon" />
+          <div class="actions">
+            <div class="button-row">
+              <button id="save-button" type="button">Save place</button>
+              <button id="destination-button" class="secondary-button" type="button">Add as destination</button>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>

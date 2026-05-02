@@ -1,0 +1,52 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  package-release:
+    name: Package release
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Validate extension
+        run: npm test
+
+      - name: Build extension ZIP
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          $artifact = "dist/wanderlog-notes-clipper-${{ github.ref_name }}.zip"
+          Compress-Archive -Path `
+            manifest.json, `
+            background.js, `
+            content.js, `
+            popup.html, `
+            popup.css, `
+            popup.js, `
+            README.md, `
+            LICENSE, `
+            CHANGELOG.md, `
+            assets, `
+            docs `
+            -DestinationPath $artifact `
+            -Force
+
+      - name: Publish GitHub release asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/wanderlog-notes-clipper-${{ github.ref_name }}.zip
+          generate_release_notes: true

@@ -21,6 +21,62 @@
         <div id="selection-box" class="selection empty">No highlighted text yet.</div>
       </section>
 
+      <section id="clip-card" class="card hidden">
+        <div class="history-header">
+          <p class="label">Selected text note</p>
+          <span id="clip-length" class="pill">0</span>
+        </div>
+        <textarea id="clip-text" rows="6" maxlength="2000"></textarea>
+        <div class="source-block">
+          <p id="clip-source-title">Untitled page</p>
+          <a id="clip-source-url" href="#" target="_blank" rel="noreferrer"></a>
+        </div>
+        <div class="form-grid">
+          <label>
+            <span class="label">Trip</span>
+            <input id="clip-trip-input" list="recent-trip-list" type="text" placeholder="E.g. Japan 2026" />
+          </label>
+          <label>
+            <span class="label">Note type</span>
+            <select id="clip-note-type">
+              <option value="Tip">Tip</option>
+              <option value="Warning">Warning</option>
+              <option value="Reservation">Reservation</option>
+              <option value="Food">Food</option>
+              <option value="Transportation">Transportation</option>
+              <option value="Other">Other</option>
+            </select>
+          </label>
+          <label>
+            <span class="label">Destination</span>
+            <select id="clip-destination-type">
+              <option value="General trip note">General trip note</option>
+              <option value="Attach to place">Attach to place</option>
+              <option value="Add to day">Add to day</option>
+              <option value="Add to list">Add to list</option>
+            </select>
+          </label>
+          <label>
+            <span class="label">Optional label</span>
+            <input id="clip-target-input" type="text" placeholder="Place, day, or list" />
+          </label>
+        </div>
+        <label class="checkbox-row">
+          <input id="clip-include-source" type="checkbox" checked />
+          <span>Include source URL</span>
+        </label>
+        <datalist id="recent-trip-list"></datalist>
+        <div class="actions">
+          <div class="button-row three-up">
+            <button id="save-clip-button" type="button">Save clip</button>
+            <button id="copy-note-button" class="secondary-button" type="button">Copy note</button>
+            <button id="open-wanderlog-button" class="secondary-button" type="button">Open Wanderlog</button>
+          </div>
+          <button id="cancel-clip-button" class="link-button" type="button">Cancel clip</button>
+          <span id="clip-status-text" class="status" aria-live="polite"></span>
+        </div>
+      </section>
+
       <section class="card">
         <label class="label" for="search-input">Place or destination</label>
         <input id="search-input" type="text" placeholder="E.g. Plaka Beach, Naxos" />
@@ -37,7 +93,7 @@
 
       <section class="card">
         <div class="history-header">
-          <p class="label">Recent Wanderlog searches</p>
+          <p class="label">Recent activity</p>
           <span id="entry-count" class="pill">0</span>
         </div>
         <ul id="entry-list" class="entry-list"></ul>

@@ -65,6 +65,10 @@ body {
   backdrop-filter: blur(8px);
 }
 
+.hidden {
+  display: none;
+}
+
 #page-title {
   font-size: 16px;
 }
@@ -105,6 +109,16 @@ textarea {
   font: inherit;
 }
 
+select {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fffdfa;
+  color: var(--ink);
+  font: inherit;
+}
+
 input {
   width: 100%;
   padding: 12px;
@@ -117,9 +131,50 @@ input {
 
 textarea:focus,
 input:focus,
+select:focus,
 button:focus {
   outline: 2px solid rgba(13, 122, 95, 0.35);
   outline-offset: 2px;
+}
+
+.source-block {
+  margin-top: 10px;
+  padding: 10px;
+  border-radius: 10px;
+  background: #fffdf9;
+  border: 1px solid var(--line);
+}
+
+.source-block p {
+  margin: 0 0 4px;
+  font-weight: 700;
+}
+
+.source-block a {
+  color: var(--accent);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  text-decoration: none;
+}
+
+.form-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 1fr 1fr;
+  margin-top: 12px;
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.checkbox-row input {
+  width: auto;
 }
 
 .actions,
@@ -142,6 +197,10 @@ button:focus {
   gap: 10px;
 }
 
+.button-row.three-up {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
 button {
   border: 0;
   border-radius: 10px;
@@ -157,6 +216,14 @@ button {
   background: #fffdfa;
   color: var(--accent-strong);
   border: 1px solid rgba(13, 122, 95, 0.25);
+}
+
+.link-button {
+  align-self: flex-start;
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
+  color: var(--muted);
 }
 
 button:hover {

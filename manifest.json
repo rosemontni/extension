@@ -1,9 +1,17 @@
 {
   "manifest_version": 3,
-  "name": "Wanderlog Save Demo",
-  "version": "0.1.0",
-  "description": "Search and save places or start a Wanderlog trip destination from highlighted text.",
-  "permissions": ["activeTab", "contextMenus", "scripting", "storage", "tabs"],
+  "name": "Wanderlog Notes Clipper",
+  "version": "0.2.0",
+  "description": "Search and save places, start trip destinations, or clip selected text notes for Wanderlog.",
+  "homepage_url": "https://github.com/rosemontni/extension",
+  "permissions": [
+    "activeTab",
+    "clipboardWrite",
+    "contextMenus",
+    "scripting",
+    "storage",
+    "tabs"
+  ],
   "host_permissions": [
     "<all_urls>",
     "https://app.wanderlog.com/*",
