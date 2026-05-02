@@ -277,32 +277,35 @@ function buildWanderlogMapUrl(search) {
 
 // --- Direct Wanderlog write support ---
 
-async function getWanderlogTrips() {
-  // Try reading trips directly from background via credentialed fetch first.
-  // This works for the geo API and may work for trips too.
-  const candidates = [
-    `${WANDERLOG_APP_URL}/api/trips`,
-    `${WANDERLOG_APP_URL}/api/v1/trips`,
-    `${WANDERLOG_APP_URL}/api/v2/trips`,
-    `${WANDERLOG_APP_URL}/api/user/trips`
-  ];
+const CACHED_TRIPS_KEY = "wanderlogCachedTrips";
+const CACHE_TTL_MS = 10 * 60 * 1000;
 
-  for (const url of candidates) {
+async function getWanderlogTrips() {
+  // 1. Use trips cached by the app.wanderlog.com content script — populated
+  //    automatically when the user browses any Wanderlog trip page.
+  const cached = await chrome.storage.local.get(CACHED_TRIPS_KEY);
+  const cachedData = cached[CACHED_TRIPS_KEY];
+  if (cachedData?.trips?.length > 0 && Date.now() - cachedData.cachedAt < CACHE_TTL_MS) {
+    return cachedData.trips;
+  }
+
+  // 2. If a Wanderlog tab is already open, ask its content script directly.
+  //    This refreshes the cache via page state / DOM scraping without opening a new tab.
+  const tabs = await chrome.tabs.query({ url: "https://app.wanderlog.com/*" });
+  const openTab = tabs.find((t) => !t.discarded);
+  if (openTab) {
     try {
-      const res = await fetch(url, { credentials: "include" });
-      if (res.ok) {
-        const data = await res.json();
-        const trips = extractTripsFromResponse(data);
-        if (trips && trips.length > 0) {
-          return trips;
-        }
+      const trips = await proxyToWanderlogTab(openTab.id, { type: "WL_GET_TRIPS" }, "trips");
+      if (trips?.length > 0) {
+        return trips;
       }
     } catch (_e) {}
   }
 
-  // Fall back to content script proxy in an open Wanderlog tab.
-  const tabId = await ensureWanderlogAppTab({ background: true });
-  return proxyToWanderlogTab(tabId, { type: "WL_GET_TRIPS" }, "trips");
+  // 3. No cached data and no open tab — tell the user what to do.
+  throw new Error(
+    "Open app.wanderlog.com and browse to one of your trips, then click Reload in the extension."
+  );
 }
 
 async function sendClipToWanderlog(payload) {

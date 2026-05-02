@@ -6,7 +6,9 @@
   window.__wanderlogAppScriptInitialized = true;
 
   const API_DISCOVERY_KEY = "wanderlogApiDiscovery";
-  const CANDIDATE_TRIP_PATHS = ["/api/trips", "/api/v1/trips", "/api/v2/trips", "/api/user/trips"];
+  const CACHED_TRIPS_KEY = "wanderlogCachedTrips";
+  const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
   const CANDIDATE_NOTE_PATHS = (tripId) => [
     `/api/trips/${tripId}/notes`,
     `/api/v1/trips/${tripId}/notes`,
@@ -21,9 +23,8 @@
     `/api/destinations`
   ];
 
-  // Discovered API patterns keyed by "METHOD:path"
   const discovered = new Map();
-  let saveTimer = null;
+  let saveDiscoveryTimer = null;
 
   chrome.storage.local.get(API_DISCOVERY_KEY).then((data) => {
     const saved = data[API_DISCOVERY_KEY];
@@ -32,7 +33,11 @@
     }
   });
 
-  // Wrap fetch to intercept Wanderlog's own API calls
+  // Wrap fetch to intercept Wanderlog's own API calls.
+  // This serves two purposes:
+  //   1. Record endpoint patterns for write operations.
+  //   2. Clone successful GET responses to cache trip data without
+  //      the guessing-game of re-fetching unknown endpoints later.
   const originalFetch = window.fetch.bind(window);
 
   window.fetch = async function wanderlogInterceptedFetch(input, init) {
@@ -45,7 +50,10 @@
           : new URL(String(input), window.location.origin);
 
       if (url.origin === window.location.origin && url.pathname.startsWith("/api/")) {
-        const method = (init?.method || (input instanceof Request ? input.method : "GET")).toUpperCase();
+        const method = (
+          init?.method ||
+          (input instanceof Request ? input.method : "GET")
+        ).toUpperCase();
         const path = url.pathname;
         const key = `${method}:${path}`;
 
@@ -64,15 +72,35 @@
         prior.lastStatus = response.status;
         discovered.set(key, prior);
 
-        clearTimeout(saveTimer);
-        saveTimer = setTimeout(() => {
+        clearTimeout(saveDiscoveryTimer);
+        saveDiscoveryTimer = setTimeout(() => {
           chrome.storage.local.set({ [API_DISCOVERY_KEY]: Object.fromEntries(discovered) });
         }, 800);
+
+        // Cache actual trip data from successful GET responses.
+        if (method === "GET" && response.ok) {
+          const cloned = response.clone();
+          cloned
+            .json()
+            .then((data) => {
+              const trips = extractTrips(data);
+              if (trips && trips.length > 0) {
+                chrome.storage.local.set({
+                  [CACHED_TRIPS_KEY]: { trips, path, cachedAt: Date.now() }
+                });
+              }
+            })
+            .catch(() => {});
+        }
       }
     } catch (_e) {}
 
     return response;
   };
+
+  // On load, try to populate the trip cache immediately from window state
+  // and from trip links visible in the page DOM.
+  populateCacheFromPage();
 
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (message?.type === "WL_GET_TRIPS") {
@@ -103,49 +131,137 @@
   });
 
   async function getTrips() {
-    // Prefer a discovered GET endpoint that looks like a trips list
-    const discoveredTripPath = [...discovered.entries()]
-      .filter(([k, v]) => k.startsWith("GET:") && /trips/.test(k) && v.lastStatus === 200)
+    // 1. Check the storage cache (populated by the fetch interceptor
+    //    or populateCacheFromPage on previous visits).
+    const cached = await chrome.storage.local.get(CACHED_TRIPS_KEY);
+    const cachedData = cached[CACHED_TRIPS_KEY];
+    if (cachedData?.trips?.length > 0 && Date.now() - cachedData.cachedAt < CACHE_TTL_MS) {
+      return cachedData.trips;
+    }
+
+    // 2. Read from the live page — window state and DOM links.
+    const pageTrips = extractFromPage();
+    if (pageTrips && pageTrips.length > 0) {
+      chrome.storage.local.set({
+        [CACHED_TRIPS_KEY]: { trips: pageTrips, cachedAt: Date.now() }
+      });
+      return pageTrips;
+    }
+
+    // 3. Re-fetch using an endpoint we already saw succeed, or discovered patterns.
+    const discoveredPath = [...discovered.entries()]
+      .filter(([k, v]) => k.startsWith("GET:") && /trip/i.test(k) && v.lastStatus === 200)
       .sort((a, b) => b[1].count - a[1].count)
       .map(([, v]) => v.path)[0];
 
-    const candidates = discoveredTripPath
-      ? [discoveredTripPath, ...CANDIDATE_TRIP_PATHS.filter((p) => p !== discoveredTripPath)]
-      : CANDIDATE_TRIP_PATHS;
-
-    for (const path of candidates) {
+    if (discoveredPath) {
       try {
-        const res = await originalFetch(path, { credentials: "same-origin" });
-        if (!res.ok) {
+        const res = await originalFetch(discoveredPath, { credentials: "same-origin" });
+        if (res.ok) {
+          const data = await res.json();
+          const trips = extractTrips(data);
+          if (trips && trips.length > 0) {
+            chrome.storage.local.set({
+              [CACHED_TRIPS_KEY]: { trips, path: discoveredPath, cachedAt: Date.now() }
+            });
+            return trips;
+          }
+        }
+      } catch (_e) {}
+    }
+
+    throw new Error(
+      "Could not read your trips from this Wanderlog page. " +
+      "Open a trip in Wanderlog, wait for it to load, then click Reload in the extension."
+    );
+  }
+
+  function populateCacheFromPage() {
+    // Run after a brief delay to let React finish rendering.
+    setTimeout(() => {
+      const trips = extractFromPage();
+      if (trips && trips.length > 0) {
+        chrome.storage.local.get(CACHED_TRIPS_KEY).then((cached) => {
+          const existing = cached[CACHED_TRIPS_KEY];
+          // Only update if the new list is at least as long or the cache is stale.
+          if (
+            !existing ||
+            trips.length >= existing.trips.length ||
+            Date.now() - existing.cachedAt > CACHE_TTL_MS
+          ) {
+            chrome.storage.local.set({
+              [CACHED_TRIPS_KEY]: { trips, cachedAt: Date.now() }
+            });
+          }
+        });
+      }
+    }, 1200);
+  }
+
+  function extractFromPage() {
+    // Try common React/Redux window state patterns.
+    const windowSources = [
+      () => window.__REDUX_STATE__,
+      () => window.__PRELOADED_STATE__,
+      () => window.__INITIAL_STATE__,
+      () => window.__NEXT_DATA__?.props?.pageProps,
+      () => window.wanderlogState
+    ];
+
+    for (const fn of windowSources) {
+      try {
+        const state = fn();
+        if (!state) {
           continue;
         }
-
-        const data = await res.json();
-        const trips = extractTrips(data);
+        const trips = extractTrips(state);
         if (trips && trips.length > 0) {
           return trips;
         }
       } catch (_e) {}
     }
 
-    throw new Error(
-      "Could not load your Wanderlog trips. Make sure you are logged in at app.wanderlog.com."
-    );
+    // Scrape trip links from the page DOM — Wanderlog's sidebar lists trips
+    // as anchor elements whose href contains "/trip/<id>".
+    const seen = new Set();
+    const trips = [];
+
+    document.querySelectorAll('a[href*="/trip/"]').forEach((link) => {
+      const match = link.pathname.match(/^\/trip\/([^/?#]+)/);
+      if (!match || seen.has(match[1])) {
+        return;
+      }
+      const name = link.textContent?.trim();
+      if (name && name.length > 0 && name.length < 120) {
+        seen.add(match[1]);
+        trips.push({ id: match[1], name });
+      }
+    });
+
+    return trips.length > 0 ? trips : null;
   }
 
   function extractTrips(data) {
+    if (!data || typeof data !== "object") {
+      return null;
+    }
+
     const candidates = [
       data,
-      data?.trips,
-      data?.data,
-      data?.data?.trips,
-      data?.result,
-      data?.result?.trips
+      data.trips,
+      data.data,
+      data.data?.trips,
+      data.result,
+      data.result?.trips,
+      data.pageProps?.trips
     ];
 
     for (const candidate of candidates) {
       if (Array.isArray(candidate) && candidate.length > 0 && candidate[0]?.id) {
-        return candidate.map(normalizeTrip).filter(Boolean);
+        const trips = candidate.map(normalizeTrip).filter(Boolean);
+        if (trips.length > 0) {
+          return trips;
+        }
       }
     }
 

@@ -227,8 +227,14 @@ async function init() {
   await loadPendingClip();
   renderImportPreview();
   renderEntries(await getEntries());
-  // Populate trip selects in the background — don't block the popup from rendering.
-  loadAndPopulateTripSelects({ userInitiated: false }).catch(() => {});
+  // Populate trip selects without blocking the popup from rendering.
+  // On failure, replace the "loading…" placeholder with an actionable prompt.
+  loadAndPopulateTripSelects({ userInitiated: false }).catch(() => {
+    const placeholder = '<option value="">— open Wanderlog first, then Reload —</option>';
+    clipTripSelect.innerHTML = placeholder;
+    clipTripSelect.disabled = false;
+    importTripSelect.innerHTML = placeholder;
+  });
 }
 
 async function getPageContext(tab) {
@@ -787,19 +793,22 @@ async function loadAndPopulateTripSelects({ userInitiated }) {
       importStatusText.textContent = `${label} Select a trip, then click Send to Wanderlog.`;
     }
   } catch (error) {
-    const placeholder = '<option value="">— could not load trips —</option>';
+    const msg = error.message || "Could not load trips.";
+    const placeholder = `<option value="">— ${escapeHtml(msg)} —</option>`;
     clipTripSelect.innerHTML = placeholder;
     importTripSelect.innerHTML = placeholder;
 
+    // Always surface the error — even on silent init the selects need a
+    // readable placeholder so the user knows what to do.
+    importStatusText.textContent = msg;
     if (userInitiated) {
-      const msg = error.message || "Could not load trips.";
       clipStatusText.textContent = msg;
-      importStatusText.textContent = msg;
     }
   } finally {
     loadTripsButton.disabled = false;
     importLoadTripsButton.disabled = false;
     clipTripSelect.disabled = false;
+    importTripSelect.disabled = false;
   }
 }
 
