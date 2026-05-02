@@ -1,8 +1,20 @@
+import {
+  MAX_CLIP_TEXT_LENGTH,
+  MAX_IMPORT_DESTINATIONS,
+  buildDestinationImportText,
+  escapeHtml,
+  formatClipNote,
+  getImportCounts,
+  normalizeClipText,
+  parseDestinationList,
+  truncate
+} from "./lib/wanderlog-utils.js";
+
 const STORAGE_KEY = "wanderlogSearches";
 const CLIPS_STORAGE_KEY = "wanderlogClips";
+const IMPORTS_STORAGE_KEY = "wanderlogDestinationImports";
 const PENDING_CLIP_KEY = "wanderlogPendingClip";
 const RECENT_TRIPS_KEY = "wanderlogRecentTripLabels";
-const MAX_CLIP_TEXT_LENGTH = 2000;
 
 const entryList = document.getElementById("entry-list");
 const entryCount = document.getElementById("entry-count");
@@ -31,12 +43,28 @@ const openWanderlogButton = document.getElementById("open-wanderlog-button");
 const cancelClipButton = document.getElementById("cancel-clip-button");
 const clipStatusText = document.getElementById("clip-status-text");
 
+const importText = document.getElementById("import-text");
+const importCount = document.getElementById("import-count");
+const importTripInput = document.getElementById("import-trip-input");
+const importTargetType = document.getElementById("import-target-type");
+const importTargetInput = document.getElementById("import-target-input");
+const parseImportButton = document.getElementById("parse-import-button");
+const checkImportButton = document.getElementById("check-import-button");
+const saveImportButton = document.getElementById("save-import-button");
+const copyImportButton = document.getElementById("copy-import-button");
+const openImportWanderlogButton = document.getElementById("open-import-wanderlog-button");
+const clearImportButton = document.getElementById("clear-import-button");
+const importStatusText = document.getElementById("import-status-text");
+const importList = document.getElementById("import-list");
+
 let currentContext = {
   title: "Untitled page",
   url: "",
   selection: ""
 };
 let currentClip = null;
+let importItems = [];
+let recentImportedDestinations = [];
 
 init().catch((error) => {
   setStatus("Could not read the active tab.");
@@ -64,7 +92,7 @@ copyNoteButton.addEventListener("click", () => {
 });
 
 openWanderlogButton.addEventListener("click", () => {
-  chrome.tabs.create({ url: "https://app.wanderlog.com/", active: true });
+  openWanderlogApp();
 });
 
 cancelClipButton.addEventListener("click", async () => {
@@ -72,6 +100,58 @@ cancelClipButton.addEventListener("click", async () => {
   currentClip = null;
   clipCard.classList.add("hidden");
   renderEntries(await getEntries());
+});
+
+parseImportButton.addEventListener("click", () => {
+  parseImportPreview();
+});
+
+checkImportButton.addEventListener("click", () => {
+  checkImportMatches();
+});
+
+saveImportButton.addEventListener("click", () => {
+  saveDestinationImport();
+});
+
+copyImportButton.addEventListener("click", () => {
+  copyDestinationImport();
+});
+
+openImportWanderlogButton.addEventListener("click", () => {
+  openWanderlogApp();
+});
+
+clearImportButton.addEventListener("click", () => {
+  importText.value = "";
+  importItems = [];
+  renderImportPreview();
+  importStatusText.textContent = "Import cleared.";
+});
+
+importList.addEventListener("change", (event) => {
+  const checkbox = event.target.closest("[data-import-toggle]");
+  if (!checkbox) {
+    return;
+  }
+
+  const item = findImportItem(checkbox.dataset.importToggle);
+  if (!item) {
+    return;
+  }
+
+  item.included = checkbox.checked;
+  renderImportPreview();
+});
+
+importList.addEventListener("click", (event) => {
+  const removeButton = event.target.closest("[data-remove-import]");
+  if (!removeButton) {
+    return;
+  }
+
+  importItems = importItems.filter((item) => item.id !== removeButton.dataset.removeImport);
+  renderImportPreview();
 });
 
 async function openWanderlog(kind) {
@@ -111,9 +191,11 @@ async function openWanderlog(kind) {
 async function init() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   currentContext = await getPageContext(tab);
+  recentImportedDestinations = await getRecentImportedDestinations();
   renderContext(currentContext);
   searchInput.value = currentContext.selection || currentContext.title || "";
   await loadPendingClip();
+  renderImportPreview();
   renderEntries(await getEntries());
 }
 
@@ -154,9 +236,10 @@ async function loadPendingClip() {
 }
 
 async function getEntries() {
-  const data = await chrome.storage.local.get([STORAGE_KEY, CLIPS_STORAGE_KEY]);
+  const data = await chrome.storage.local.get([STORAGE_KEY, CLIPS_STORAGE_KEY, IMPORTS_STORAGE_KEY]);
   const searches = Array.isArray(data[STORAGE_KEY]) ? data[STORAGE_KEY] : [];
   const clips = Array.isArray(data[CLIPS_STORAGE_KEY]) ? data[CLIPS_STORAGE_KEY] : [];
+  const imports = Array.isArray(data[IMPORTS_STORAGE_KEY]) ? data[IMPORTS_STORAGE_KEY] : [];
 
   return [
     ...searches.map((entry) => ({
@@ -168,6 +251,11 @@ async function getEntries() {
       ...entry,
       activityType: "clip",
       activityAt: entry.savedAt || entry.capturedAt
+    })),
+    ...imports.map((entry) => ({
+      ...entry,
+      activityType: "import",
+      activityAt: entry.savedAt || entry.preparedAt
     }))
   ].sort((left, right) => new Date(right.activityAt) - new Date(left.activityAt));
 }
@@ -216,19 +304,11 @@ function renderEntries(entries) {
     .slice(0, 6)
     .map((entry) => {
       if (entry.activityType === "clip") {
-        const destination = entry.destinationLabel
-          ? `${entry.destinationType}: ${entry.destinationLabel}`
-          : entry.destinationType;
+        return renderClipEntry(entry);
+      }
 
-        return `
-          <li class="entry-item">
-            <h3>${escapeHtml(truncate(entry.selectedText, 70))}</h3>
-            <p>Saved note | ${escapeHtml(entry.noteType)}</p>
-            ${entry.tripLabel ? `<p>Trip: ${escapeHtml(entry.tripLabel)}</p>` : ""}
-            <p>${escapeHtml(destination)}</p>
-            <p>${escapeHtml(new Date(entry.activityAt).toLocaleString())}</p>
-          </li>
-        `;
+      if (entry.activityType === "import") {
+        return renderImportEntry(entry);
       }
 
       return `
@@ -241,6 +321,36 @@ function renderEntries(entries) {
       `;
     })
     .join("");
+}
+
+function renderClipEntry(entry) {
+  const destination = entry.destinationLabel
+    ? `${entry.destinationType}: ${entry.destinationLabel}`
+    : entry.destinationType;
+
+  return `
+    <li class="entry-item">
+      <h3>${escapeHtml(truncate(entry.selectedText, 70))}</h3>
+      <p>Saved note | ${escapeHtml(entry.noteType)}</p>
+      ${entry.tripLabel ? `<p>Trip: ${escapeHtml(entry.tripLabel)}</p>` : ""}
+      <p>${escapeHtml(destination)}</p>
+      <p>${escapeHtml(new Date(entry.activityAt).toLocaleString())}</p>
+    </li>
+  `;
+}
+
+function renderImportEntry(entry) {
+  const counts = getImportCounts(entry.items || []);
+  const target = entry.targetLabel ? `${entry.targetType}: ${entry.targetLabel}` : entry.targetType;
+
+  return `
+    <li class="entry-item">
+      <h3>Destination import: ${counts.usable} places</h3>
+      ${entry.tripLabel ? `<p>Trip: ${escapeHtml(entry.tripLabel)}</p>` : ""}
+      <p>${escapeHtml(target)} | ${counts.matched} matched, ${counts.duplicates} duplicates</p>
+      <p>${escapeHtml(new Date(entry.activityAt).toLocaleString())}</p>
+    </li>
+  `;
 }
 
 async function saveClipLocally() {
@@ -310,32 +420,234 @@ function buildClipFromForm() {
   };
 }
 
-function formatClipNote(clip) {
-  const noteText = clip.selectedText.includes("\n")
-    ? `${clip.noteType}:\n${clip.selectedText}`
-    : `${clip.noteType}: ${clip.selectedText}`;
-  const metadata = [];
+async function parseImportPreview() {
+  const parsed = parseDestinationList(importText.value, {
+    existingDestinations: recentImportedDestinations,
+    maxItems: MAX_IMPORT_DESTINATIONS
+  });
 
-  if (clip.tripLabel) {
-    metadata.push(`Trip: ${clip.tripLabel}`);
+  importItems = parsed.items.map((item, index) => ({
+    ...item,
+    id: `${Date.now()}-${index}`,
+    included: item.status !== "duplicate"
+  }));
+
+  renderImportPreview();
+
+  if (!importItems.length) {
+    importStatusText.textContent = "Paste one destination per line to preview an import.";
+  } else if (parsed.truncatedCount) {
+    importStatusText.textContent =
+      `Previewing the first ${MAX_IMPORT_DESTINATIONS} destinations. ` +
+      `${parsed.truncatedCount} extra entries were skipped.`;
+  } else {
+    const counts = getImportCounts(importItems);
+    importStatusText.textContent =
+      `Preview ready: ${counts.usable} usable, ${counts.duplicates} duplicates.`;
+  }
+}
+
+function renderImportPreview() {
+  const counts = getImportCounts(importItems);
+  importCount.textContent = `${counts.usable}/${counts.total}`;
+  checkImportButton.disabled = counts.usable === 0;
+  saveImportButton.disabled = counts.usable === 0;
+  copyImportButton.disabled = counts.usable === 0;
+
+  if (!importItems.length) {
+    importList.innerHTML = "<li class=\"import-empty\">No destination preview yet.</li>";
+    return;
   }
 
-  metadata.push(
-    clip.destinationLabel
-      ? `${clip.destinationType}: ${clip.destinationLabel}`
-      : `Destination: ${clip.destinationType}`
+  importList.innerHTML = importItems
+    .map((item) => {
+      const checked = item.included !== false ? "checked" : "";
+      const disabled = item.status === "duplicate" ? "disabled" : "";
+      const meta = getImportItemMeta(item);
+
+      return `
+        <li class="import-item ${escapeHtml(item.status)}">
+          <div class="import-item-header">
+            <label class="import-toggle">
+              <input
+                type="checkbox"
+                data-import-toggle="${escapeHtml(item.id)}"
+                ${checked}
+                ${disabled}
+              />
+              <span class="import-name">${escapeHtml(item.name)}</span>
+            </label>
+            <span class="status-pill ${escapeHtml(item.status)}">${escapeHtml(getImportStatusLabel(item))}</span>
+          </div>
+          ${meta ? `<p class="import-meta">${escapeHtml(meta)}</p>` : ""}
+          <button class="link-button" type="button" data-remove-import="${escapeHtml(item.id)}">
+            Remove
+          </button>
+        </li>
+      `;
+    })
+    .join("");
+}
+
+async function checkImportMatches() {
+  if (!importItems.length) {
+    await parseImportPreview();
+  }
+
+  const candidates = importItems.filter(
+    (item) => item.included !== false && item.status !== "duplicate"
   );
 
-  if (clip.sourceTitle) {
-    metadata.push(`Source: ${clip.sourceTitle}`);
+  if (!candidates.length) {
+    importStatusText.textContent = "No usable destinations to check.";
+    return;
   }
 
-  if (clip.includeSourceUrl && clip.sourceUrl) {
-    metadata.push(clip.sourceUrl);
+  setImportButtonsDisabled(true);
+
+  try {
+    for (const item of candidates) {
+      item.status = "checking";
+      renderImportPreview();
+      importStatusText.textContent = `Checking ${item.name}...`;
+
+      try {
+        const response = await chrome.runtime.sendMessage({
+          type: "RESOLVE_WANDERLOG_DESTINATION",
+          search: item.name
+        });
+
+        if (!response?.ok) {
+          throw new Error(response?.error || "No match response.");
+        }
+
+        if (response.result?.matchedName) {
+          item.status = "matched";
+          item.matchedName = response.result.matchedName;
+          item.geoId = response.result.geoId;
+          item.createUrl = response.result.createUrl;
+        } else {
+          item.status = "unmatched";
+          item.matchedName = "";
+        }
+      } catch (error) {
+        item.status = "failed";
+        item.error = error.message || "Could not check match.";
+      }
+    }
+
+    const counts = getImportCounts(importItems);
+    importStatusText.textContent =
+      `Match check done: ${counts.matched} matched, ${counts.unmatched} unmatched, ` +
+      `${counts.failed} failed.`;
+  } finally {
+    setImportButtonsDisabled(false);
+    renderImportPreview();
+  }
+}
+
+async function saveDestinationImport() {
+  try {
+    const session = buildDestinationImportSession();
+    const data = await chrome.storage.local.get([IMPORTS_STORAGE_KEY, RECENT_TRIPS_KEY]);
+    const imports = Array.isArray(data[IMPORTS_STORAGE_KEY]) ? data[IMPORTS_STORAGE_KEY] : [];
+    const recentTrips = Array.isArray(data[RECENT_TRIPS_KEY]) ? data[RECENT_TRIPS_KEY] : [];
+    const nextTrips = addRecentTrip(recentTrips, session.tripLabel);
+
+    await chrome.storage.local.set({
+      [IMPORTS_STORAGE_KEY]: [session, ...imports].slice(0, 25),
+      [RECENT_TRIPS_KEY]: nextTrips
+    });
+
+    recentImportedDestinations = await getRecentImportedDestinations();
+    renderRecentTrips(nextTrips);
+    importStatusText.textContent =
+      "Import saved locally. Copy the list or open Wanderlog to add it manually.";
+    renderEntries(await getEntries());
+  } catch (error) {
+    importStatusText.textContent = error.message || "Could not save import.";
+  }
+}
+
+async function copyDestinationImport() {
+  try {
+    const session = buildDestinationImportSession();
+    await copyTextToClipboard(buildDestinationImportText(session));
+    importStatusText.textContent = "Destination import copied.";
+  } catch (error) {
+    importStatusText.textContent = error.message || "Could not copy destination import.";
+  }
+}
+
+function buildDestinationImportSession() {
+  const usableItems = importItems.filter(
+    (item) => item.included !== false && item.status !== "duplicate"
+  );
+
+  if (!usableItems.length) {
+    throw new Error("Preview at least one usable destination first.");
   }
 
-  metadata.push(`Captured: ${new Date(clip.capturedAt).toLocaleString()}`);
-  return `${noteText}\n\n${metadata.join("\n")}`;
+  return {
+    id: crypto.randomUUID(),
+    tripLabel: importTripInput.value.trim(),
+    targetType: importTargetType.value,
+    targetLabel: importTargetInput.value.trim(),
+    sourceTitle: currentContext.title,
+    sourceUrl: currentContext.url,
+    preparedAt: new Date().toISOString(),
+    savedAt: new Date().toISOString(),
+    status: "prepared",
+    items: importItems.map((item) => ({ ...item }))
+  };
+}
+
+async function getRecentImportedDestinations() {
+  const data = await chrome.storage.local.get(IMPORTS_STORAGE_KEY);
+  const imports = Array.isArray(data[IMPORTS_STORAGE_KEY]) ? data[IMPORTS_STORAGE_KEY] : [];
+
+  return imports
+    .flatMap((entry) => entry.items || [])
+    .filter((item) => item.status !== "duplicate")
+    .map((item) => item.name)
+    .slice(0, 200);
+}
+
+function findImportItem(id) {
+  return importItems.find((item) => item.id === id);
+}
+
+function getImportStatusLabel(item) {
+  const labels = {
+    ready: "Ready",
+    duplicate: "Duplicate",
+    checking: "Checking",
+    matched: "Matched",
+    unmatched: "No match",
+    failed: "Failed"
+  };
+
+  return labels[item.status] || "Ready";
+}
+
+function getImportItemMeta(item) {
+  if (item.status === "duplicate") {
+    return item.duplicateReason;
+  }
+
+  if (item.status === "matched") {
+    return item.matchedName ? `Wanderlog match: ${item.matchedName}` : "Matched in Wanderlog";
+  }
+
+  if (item.status === "unmatched") {
+    return "No Wanderlog geo match found; keep it for manual import.";
+  }
+
+  if (item.status === "failed") {
+    return item.error || "Could not check this destination.";
+  }
+
+  return `Line ${item.lineNumber}`;
 }
 
 async function copyTextToClipboard(text) {
@@ -384,6 +696,13 @@ function setButtonsDisabled(disabled) {
   destinationButton.disabled = disabled;
 }
 
+function setImportButtonsDisabled(disabled) {
+  parseImportButton.disabled = disabled;
+  checkImportButton.disabled = disabled;
+  saveImportButton.disabled = disabled;
+  copyImportButton.disabled = disabled;
+}
+
 function getSuccessMessage(kind, result) {
   if (kind === "destination") {
     if (result?.matchedName) {
@@ -398,29 +717,6 @@ function getSuccessMessage(kind, result) {
     : "Opened Wanderlog on this page.";
 }
 
-function normalizeClipText(value) {
-  return String(value || "")
-    .replace(/\r\n/g, "\n")
-    .split("\n")
-    .map((line) => line.trim())
-    .join("\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-}
-
-function truncate(value, maxLength) {
-  if (value.length <= maxLength) {
-    return value;
-  }
-
-  return `${value.slice(0, maxLength - 3)}...`;
-}
-
-function escapeHtml(value) {
-  return String(value || "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll("\"", "&quot;")
-    .replaceAll("'", "&#39;");
+function openWanderlogApp() {
+  chrome.tabs.create({ url: "https://app.wanderlog.com/", active: true });
 }

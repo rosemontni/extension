@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Wanderlog Save Demo</title>
+    <title>Wanderlog Notes Clipper</title>
     <link rel="stylesheet" href="popup.css" />
   </head>
   <body>
@@ -11,7 +11,7 @@
       <header class="hero">
         <p class="eyebrow">Wanderlog</p>
         <h1>Save to trip</h1>
-        <p class="subtitle">Use selected text as a place search or a trip destination.</p>
+        <p class="subtitle">Clip notes, save places, or prepare destination lists.</p>
       </header>
 
       <section class="card">
@@ -65,7 +65,6 @@
           <input id="clip-include-source" type="checkbox" checked />
           <span>Include source URL</span>
         </label>
-        <datalist id="recent-trip-list"></datalist>
         <div class="actions">
           <div class="button-row three-up">
             <button id="save-clip-button" type="button">Save clip</button>
@@ -93,13 +92,62 @@
 
       <section class="card">
         <div class="history-header">
+          <div>
+            <p class="label">Bulk destination importer</p>
+            <p class="helper-text">Paste one destination per line. Bullets, numbering, and blanks are cleaned before preview.</p>
+          </div>
+          <span id="import-count" class="pill">0</span>
+        </div>
+        <textarea
+          id="import-text"
+          rows="6"
+          placeholder="Senso-ji&#10;Meiji Shrine&#10;Shibuya Sky&#10;Tsukiji Outer Market"
+        ></textarea>
+        <div class="form-grid">
+          <label>
+            <span class="label">Trip</span>
+            <input id="import-trip-input" list="recent-trip-list" type="text" placeholder="E.g. Japan 2026" />
+          </label>
+          <label>
+            <span class="label">Target</span>
+            <select id="import-target-type">
+              <option value="Trip itinerary">Trip itinerary</option>
+              <option value="Day">Day</option>
+              <option value="Section">Section</option>
+              <option value="Custom list">Custom list</option>
+            </select>
+          </label>
+          <label class="wide-field">
+            <span class="label">Optional target label</span>
+            <input id="import-target-input" type="text" placeholder="E.g. Tokyo day 2 or Food list" />
+          </label>
+        </div>
+        <div class="actions">
+          <div class="button-row">
+            <button id="parse-import-button" type="button">Preview list</button>
+            <button id="check-import-button" class="secondary-button" type="button">Check matches</button>
+          </div>
+          <ul id="import-list" class="import-list"></ul>
+          <div class="button-row three-up">
+            <button id="save-import-button" type="button">Save import</button>
+            <button id="copy-import-button" class="secondary-button" type="button">Copy list</button>
+            <button id="open-import-wanderlog-button" class="secondary-button" type="button">Open Wanderlog</button>
+          </div>
+          <button id="clear-import-button" class="link-button" type="button">Clear import</button>
+          <span id="import-status-text" class="status" aria-live="polite"></span>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="history-header">
           <p class="label">Recent activity</p>
           <span id="entry-count" class="pill">0</span>
         </div>
         <ul id="entry-list" class="entry-list"></ul>
       </section>
+      <datalist id="recent-trip-list"></datalist>
     </main>
 
-    <script src="popup.js"></script>
+    <script type="module" src="popup.js"></script>
   </body>
 </html>

@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.3.0 - 2026-05-02
+
+- Added a bulk destination-list importer with one-place-per-line parsing, bullet/number cleanup, preview, remove/uncheck controls, duplicate warnings, and local import storage.
+- Added Wanderlog autocomplete match checking for prepared destination imports.
+- Added formatted copy output for manual Wanderlog import handoff.
+- Moved shared note/import formatting and parsing logic into a tested utility module.
+
 ## v0.2.0 - 2026-05-02
 
 - Added a right-click "Save selected text to Wanderlog" flow for highlighted webpage text.

@@ -14,12 +14,15 @@ The promotional banner in `assets/wanderlog-notes-banner.png` was generated for 
 
 ![Popup note clipping workflow](docs/screenshots/popup-note-flow.png)
 
+![Bulk destination importer workflow](docs/screenshots/bulk-import-flow.png)
+
 ## Features
 
 - Save a place by opening Wanderlog's authenticated save/search panel for the active tab.
 - Add highlighted text as a trip destination by resolving it through Wanderlog geo autocomplete, then opening Wanderlog's trip creation flow with the destination selected when possible.
 - Right-click selected webpage text and choose **Save selected text to Wanderlog** to create an editable note draft.
 - Save selected text clips locally, keep recent trip labels, copy a formatted note, and open Wanderlog for paste or trip organization.
+- Paste a bulk list of destinations, clean bullets/numbering, preview entries, remove bad rows, warn about duplicates, and check Wanderlog geo matches.
 - Preserve source title, source URL, note type, destination/list/day target, and captured timestamp for clipped text.
 
 ## Install Locally
@@ -39,6 +42,15 @@ The promotional banner in `assets/wanderlog-notes-banner.png` was generated for 
 5. Click **Save clip** to store the note in Chrome extension storage, or **Copy note** to paste it into Wanderlog.
 6. Click **Open Wanderlog** to continue organizing the note in the Wanderlog web app.
 
+## Bulk Destination Import Flow
+
+1. Paste one destination per line into **Bulk destination importer**.
+2. Click **Preview list** to clean bullets, numbering, blank lines, and duplicate entries.
+3. Remove incorrect rows or uncheck entries you do not want in the import.
+4. Click **Check matches** to resolve each destination through Wanderlog geo autocomplete.
+5. Click **Save import** to keep the prepared import locally, or **Copy list** to paste a structured import into Wanderlog.
+6. Click **Open Wanderlog** to continue adding the destinations to the chosen trip, day, section, or custom list.
+
 ## Where Saved Content Goes
 
 Place saves are handed off to Wanderlog's authenticated extension panel. After you choose the trip or list inside Wanderlog, the saved place lives in that Wanderlog destination.
@@ -46,6 +58,8 @@ Place saves are handed off to Wanderlog's authenticated extension panel. After y
 Destination adds open Wanderlog's trip creation page. If Wanderlog autocomplete resolves the selected text, the destination is preselected there.
 
 Selected text clips are stored locally in Chrome extension storage under `wanderlogClips` and can be copied as formatted text for Wanderlog. Wanderlog does not expose a documented public API for writing arbitrary trip notes, so this extension keeps the captured note source of truth local and makes the Wanderlog handoff explicit.
+
+Bulk destination imports are stored locally under `wanderlogDestinationImports`. The importer can check Wanderlog geo matches, but the final trip/list insertion remains a manual Wanderlog handoff unless a stable official API becomes available.
 
 The popup's **Recent activity** list is local extension history. It is useful for quick recall, but Wanderlog remains the source of truth for anything you save through Wanderlog's own UI.
 
@@ -57,7 +71,7 @@ npm test
 
 The check script validates the Manifest V3 metadata, required files, expected permissions, Wanderlog host permissions, version alignment, and JavaScript syntax.
 
-CI runs the same validation on pushes to `main` and pull requests. The release workflow packages version tags like `v0.2.0` into a ZIP and uploads it to GitHub Releases.
+CI runs the same validation on pushes to `main` and pull requests. The release workflow packages version tags like `v0.3.0` into a ZIP and uploads it to GitHub Releases.
 
 ## Release Standard
 

@@ -1,3 +1,5 @@
+import { MAX_CLIP_TEXT_LENGTH, normalizeClipText, normalizeSearch } from "./lib/wanderlog-utils.js";
+
 const STORAGE_KEY = "wanderlogSearches";
 const PENDING_CLIP_KEY = "wanderlogPendingClip";
 const PLACE_MENU_ID = "wanderlog-save-place";
@@ -5,7 +7,6 @@ const DESTINATION_MENU_ID = "wanderlog-add-destination";
 const CLIP_MENU_ID = "wanderlog-save-selected-text";
 const WANDERLOG_APP_URL = "https://app.wanderlog.com";
 const WANDERLOG_MAP_URL = "https://extensionembed.wanderlog.com/extension/map";
-const MAX_CLIP_TEXT_LENGTH = 2000;
 
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.removeAll(() => {
@@ -61,6 +62,25 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type === "OPEN_WANDERLOG_DESTINATION") {
     openWanderlogDestination(message.search, message.sourceUrl)
       .then((result) => sendResponse({ ok: true, result }))
+      .catch((error) => sendResponse({ ok: false, error: error.message }));
+
+    return true;
+  }
+
+  if (message?.type === "RESOLVE_WANDERLOG_DESTINATION") {
+    resolveDestinationGeo(message.search)
+      .then((geo) =>
+        sendResponse({
+          ok: true,
+          result: geo
+            ? {
+                geoId: geo.id,
+                matchedName: formatGeoName(geo),
+                createUrl: buildWanderlogDestinationUrl(geo)
+              }
+            : null
+        })
+      )
       .catch((error) => sendResponse({ ok: false, error: error.message }));
 
     return true;
@@ -215,20 +235,6 @@ async function rememberSearch(searchRecord) {
 
 function getSearchText({ selection, title, url }) {
   return normalizeSearch(selection) || normalizeSearch(title) || normalizeSearch(url);
-}
-
-function normalizeSearch(value) {
-  return String(value || "").replace(/\s+/g, " ").trim().slice(0, 200);
-}
-
-function normalizeClipText(value) {
-  return String(value || "")
-    .replace(/\r\n/g, "\n")
-    .split("\n")
-    .map((line) => line.trim())
-    .join("\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
 }
 
 function getDomain(url) {

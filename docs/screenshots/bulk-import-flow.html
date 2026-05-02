@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Wanderlog bulk importer screenshot</title>
+    <link rel="stylesheet" href="../../popup.css" />
+    <style>
+      body {
+        min-width: 0;
+        display: grid;
+        place-items: center;
+        min-height: 100vh;
+        padding: 40px;
+      }
+
+      .popup {
+        width: 430px;
+      }
+
+      .screenshot-shell {
+        border-radius: 28px;
+        padding: 12px;
+        background: rgba(255, 255, 255, 0.55);
+        box-shadow: 0 28px 80px rgba(28, 24, 16, 0.22);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="screenshot-shell">
+      <main class="popup">
+        <header class="hero">
+          <p class="eyebrow">Wanderlog</p>
+          <h1>Import destinations</h1>
+          <p class="subtitle">Clean, dedupe, and prepare a pasted trip list.</p>
+        </header>
+
+        <section class="card">
+          <div class="history-header">
+            <div>
+              <p class="label">Bulk destination importer</p>
+              <p class="helper-text">Paste one destination per line. Bullets and numbering are cleaned before preview.</p>
+            </div>
+            <span class="pill">4/5</span>
+          </div>
+          <textarea rows="6">1. Senso-ji
+- Meiji Shrine
+* Shibuya Sky
+2) Senso ji
+[ ] Tsukiji Outer Market</textarea>
+          <div class="form-grid">
+            <label>
+              <span class="label">Trip</span>
+              <input type="text" value="Japan 2026" />
+            </label>
+            <label>
+              <span class="label">Target</span>
+              <select>
+                <option selected>Trip itinerary</option>
+              </select>
+            </label>
+            <label class="wide-field">
+              <span class="label">Optional target label</span>
+              <input type="text" value="Tokyo planning list" />
+            </label>
+          </div>
+          <div class="actions">
+            <div class="button-row">
+              <button type="button">Preview list</button>
+              <button class="secondary-button" type="button">Check matches</button>
+            </div>
+            <ul class="import-list">
+              <li class="import-item matched">
+                <div class="import-item-header">
+                  <label class="import-toggle">
+                    <input type="checkbox" checked />
+                    <span class="import-name">Senso-ji</span>
+                  </label>
+                  <span class="status-pill matched">Matched</span>
+                </div>
+                <p class="import-meta">Wanderlog match: Senso-ji, Tokyo, Japan</p>
+              </li>
+              <li class="import-item matched">
+                <div class="import-item-header">
+                  <label class="import-toggle">
+                    <input type="checkbox" checked />
+                    <span class="import-name">Meiji Shrine</span>
+                  </label>
+                  <span class="status-pill matched">Matched</span>
+                </div>
+                <p class="import-meta">Wanderlog match: Meiji Shrine, Tokyo, Japan</p>
+              </li>
+              <li class="import-item duplicate">
+                <div class="import-item-header">
+                  <label class="import-toggle">
+                    <input type="checkbox" disabled />
+                    <span class="import-name">Senso ji</span>
+                  </label>
+                  <span class="status-pill duplicate">Duplicate</span>
+                </div>
+                <p class="import-meta">Duplicate in pasted list</p>
+              </li>
+            </ul>
+            <div class="button-row three-up">
+              <button type="button">Save import</button>
+              <button class="secondary-button" type="button">Copy list</button>
+              <button class="secondary-button" type="button">Open Wanderlog</button>
+            </div>
+            <span class="status">Match check done: 4 matched, 0 unmatched, 0 failed.</span>
+          </div>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>

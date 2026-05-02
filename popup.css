@@ -129,6 +129,10 @@ input {
   font: inherit;
 }
 
+.wide-field {
+  grid-column: 1 / -1;
+}
+
 textarea:focus,
 input:focus,
 select:focus,
@@ -175,6 +179,13 @@ button:focus {
 
 .checkbox-row input {
   width: auto;
+}
+
+.helper-text {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  max-width: 280px;
 }
 
 .actions,
@@ -282,4 +293,87 @@ button:disabled {
 .entry-item .entry-note {
   margin-top: 8px;
   color: var(--ink);
+}
+
+.import-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 10px;
+}
+
+.import-empty {
+  padding: 12px;
+  border-radius: 12px;
+  background: #fffdf9;
+  border: 1px dashed var(--line);
+  color: var(--muted);
+}
+
+.import-item {
+  padding: 12px;
+  border-radius: 12px;
+  background: #fffdf9;
+  border: 1px solid var(--line);
+}
+
+.import-item.duplicate {
+  opacity: 0.72;
+}
+
+.import-item-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.import-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+}
+
+.import-toggle input {
+  width: auto;
+  margin-top: 3px;
+}
+
+.import-name {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.import-meta {
+  margin: 6px 0 0 24px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.status-pill {
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(112, 103, 90, 0.1);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.status-pill.matched {
+  background: rgba(13, 122, 95, 0.12);
+  color: var(--accent-strong);
+}
+
+.status-pill.duplicate,
+.status-pill.failed {
+  background: rgba(175, 73, 41, 0.12);
+  color: #8a3a20;
+}
+
+.status-pill.checking {
+  background: rgba(236, 160, 61, 0.18);
+  color: #8a5a11;
 }

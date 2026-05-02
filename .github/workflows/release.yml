@@ -37,6 +37,7 @@ jobs:
             popup.html, `
             popup.css, `
             popup.js, `
+            lib, `
             README.md, `
             LICENSE, `
             CHANGELOG.md, `

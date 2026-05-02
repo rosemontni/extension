@@ -7,10 +7,11 @@ const files = [
   "content.js",
   "popup.html",
   "popup.css",
-  "popup.js"
+  "popup.js",
+  "lib/wanderlog-utils.js"
 ];
 
-const jsFiles = ["background.js", "content.js", "popup.js"];
+const jsFiles = ["background.js", "content.js", "popup.js", "lib/wanderlog-utils.js"];
 const requiredPermissions = [
   "activeTab",
   "clipboardWrite",
