@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Wanderlog Save Demo</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main class="popup">
+      <header class="hero">
+        <p class="eyebrow">Wanderlog</p>
+        <h1>Save to trip</h1>
+        <p class="subtitle">Use selected text as a place search or a trip destination.</p>
+      </header>
+
+      <section class="card">
+        <p class="label">Current page</p>
+        <h2 id="page-title">Loading page title...</h2>
+        <a id="page-url" href="#" target="_blank" rel="noreferrer">Loading URL...</a>
+        <div id="selection-box" class="selection empty">No highlighted text yet.</div>
+      </section>
+
+      <section class="card">
+        <label class="label" for="search-input">Place or destination</label>
+        <input id="search-input" type="text" placeholder="E.g. Plaka Beach, Naxos" />
+        <div class="actions">
+          <div class="button-row">
+            <button id="save-button" type="button">Save place</button>
+            <button id="destination-button" class="secondary-button" type="button">
+              Add as destination
+            </button>
+          </div>
+          <span id="status-text" class="status" aria-live="polite"></span>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="history-header">
+          <p class="label">Recent Wanderlog searches</p>
+          <span id="entry-count" class="pill">0</span>
+        </div>
+        <ul id="entry-list" class="entry-list"></ul>
+      </section>
+    </main>
+
+    <script src="popup.js"></script>
+  </body>
+</html>
