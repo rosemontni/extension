@@ -288,18 +288,27 @@ async function getWanderlogTrips() {
   if (cachedData?.trips?.length > 0 && Date.now() - cachedData.cachedAt < CACHE_TTL_MS) {
     return cachedData.trips;
   }
+  const staleTrips = cachedData?.trips?.length > 0 ? cachedData.trips : null;
 
   // 2. If a Wanderlog tab is already open, ask its content script directly.
   //    This refreshes the cache via page state / DOM scraping without opening a new tab.
   const tabs = await chrome.tabs.query({ url: "https://app.wanderlog.com/*" });
   const openTab = tabs.find((t) => !t.discarded);
   if (openTab) {
-    try {
-      const trips = await proxyToWanderlogTab(openTab.id, { type: "WL_GET_TRIPS" }, "trips");
-      if (trips?.length > 0) {
-        return trips;
-      }
-    } catch (_e) {}
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        const trips = await proxyToWanderlogTab(openTab.id, { type: "WL_GET_TRIPS" }, "trips");
+        if (trips?.length > 0) {
+          return trips;
+        }
+      } catch (_e) {}
+
+      await sleep(700);
+    }
+  }
+
+  if (staleTrips) {
+    return staleTrips;
   }
 
   // 3. No cached data and no open tab — tell the user what to do.
@@ -371,6 +380,11 @@ async function proxyToWanderlogTab(tabId, message, resultKey) {
     // Content script may not be ready yet; inject and retry once.
     await chrome.scripting.executeScript({
       target: { tabId },
+      files: ["wanderlog-page-bridge.js"],
+      world: "MAIN"
+    });
+    await chrome.scripting.executeScript({
+      target: { tabId },
       files: ["wanderlog-app.js"]
     });
     await new Promise((resolve) => setTimeout(resolve, 300));
@@ -382,4 +396,8 @@ async function proxyToWanderlogTab(tabId, message, resultKey) {
   }
 
   return response[resultKey];
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }

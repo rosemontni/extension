@@ -7,6 +7,6 @@
   "type": "module",
   "scripts": {
     "check": "node scripts/check-extension.mjs",
-    "test": "node scripts/check-extension.mjs && node scripts/wanderlog-utils.test.mjs"
+    "test": "node scripts/check-extension.mjs && node scripts/wanderlog-utils.test.mjs && node scripts/wanderlog-page-bridge.test.mjs"
   }
 }

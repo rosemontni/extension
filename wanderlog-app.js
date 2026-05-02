@@ -8,6 +8,8 @@
   const API_DISCOVERY_KEY = "wanderlogApiDiscovery";
   const CACHED_TRIPS_KEY = "wanderlogCachedTrips";
   const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+  const PAGE_SOURCE = "wanderlog-notes-clipper-page";
+  const EXTENSION_SOURCE = "wanderlog-notes-clipper-extension";
 
   const CANDIDATE_NOTE_PATHS = (tripId) => [
     `/api/trips/${tripId}/notes`,
@@ -24,7 +26,9 @@
   ];
 
   const discovered = new Map();
+  const pendingPageTripRequests = new Map();
   let saveDiscoveryTimer = null;
+  let pageTripRequestId = 0;
 
   chrome.storage.local.get(API_DISCOVERY_KEY).then((data) => {
     const saved = data[API_DISCOVERY_KEY];
@@ -33,11 +37,10 @@
     }
   });
 
-  // Wrap fetch to intercept Wanderlog's own API calls.
-  // This serves two purposes:
-  //   1. Record endpoint patterns for write operations.
-  //   2. Clone successful GET responses to cache trip data without
-  //      the guessing-game of re-fetching unknown endpoints later.
+  window.addEventListener("message", handlePageBridgeMessage);
+
+  // Keep intercepting requests made by this extension script. The page-world
+  // bridge observes Wanderlog's own app fetches and reports them back here.
   const originalFetch = window.fetch.bind(window);
 
   window.fetch = async function wanderlogInterceptedFetch(input, init) {
@@ -55,7 +58,6 @@
           (input instanceof Request ? input.method : "GET")
         ).toUpperCase();
         const path = url.pathname;
-        const key = `${method}:${path}`;
 
         let bodyKeys = [];
         if (init?.body && typeof init.body === "string") {
@@ -64,18 +66,7 @@
           } catch (_e) {}
         }
 
-        const prior = discovered.get(key) || { method, path, bodyKeys: [], count: 0 };
-        prior.count += 1;
-        if (bodyKeys.length > prior.bodyKeys.length) {
-          prior.bodyKeys = bodyKeys;
-        }
-        prior.lastStatus = response.status;
-        discovered.set(key, prior);
-
-        clearTimeout(saveDiscoveryTimer);
-        saveDiscoveryTimer = setTimeout(() => {
-          chrome.storage.local.set({ [API_DISCOVERY_KEY]: Object.fromEntries(discovered) });
-        }, 800);
+        recordApiDiscovery({ method, path, bodyKeys, lastStatus: response.status });
 
         // Cache actual trip data from successful GET responses.
         if (method === "GET" && response.ok) {
@@ -83,11 +74,9 @@
           cloned
             .json()
             .then((data) => {
-              const trips = extractTrips(data);
+              const trips = extractTrips(data, path);
               if (trips && trips.length > 0) {
-                chrome.storage.local.set({
-                  [CACHED_TRIPS_KEY]: { trips, path, cachedAt: Date.now() }
-                });
+                cacheTrips(trips, { path });
               }
             })
             .catch(() => {});
@@ -130,6 +119,105 @@
     }
   });
 
+  function handlePageBridgeMessage(event) {
+    if (event.source !== window || event.data?.source !== PAGE_SOURCE) {
+      return;
+    }
+
+    if (event.data.type === "WL_PAGE_API") {
+      recordApiDiscovery(event.data.api);
+      return;
+    }
+
+    if (event.data.type === "WL_PAGE_TRIPS") {
+      cacheTrips(event.data.trips, {
+        path: event.data.path,
+        source: event.data.source,
+        cachedAt: event.data.cachedAt
+      });
+      return;
+    }
+
+    if (event.data.type === "WL_PAGE_TRIPS_RESPONSE") {
+      const pending = pendingPageTripRequests.get(event.data.requestId);
+      if (!pending) {
+        return;
+      }
+
+      clearTimeout(pending.timeoutId);
+      pendingPageTripRequests.delete(event.data.requestId);
+      const trips = cacheTrips(event.data.trips, { source: "page-bridge" });
+      pending.resolve(trips);
+    }
+  }
+
+  function recordApiDiscovery(api) {
+    if (!api?.method || !api?.path) {
+      return;
+    }
+
+    const key = `${api.method}:${api.path}`;
+    const prior = discovered.get(key) || {
+      method: api.method,
+      path: api.path,
+      bodyKeys: [],
+      count: 0
+    };
+
+    prior.count += 1;
+    if (Array.isArray(api.bodyKeys) && api.bodyKeys.length > prior.bodyKeys.length) {
+      prior.bodyKeys = api.bodyKeys;
+    }
+    prior.lastStatus = api.lastStatus;
+    discovered.set(key, prior);
+
+    clearTimeout(saveDiscoveryTimer);
+    saveDiscoveryTimer = setTimeout(() => {
+      chrome.storage.local.set({ [API_DISCOVERY_KEY]: Object.fromEntries(discovered) });
+    }, 800);
+  }
+
+  function requestTripsFromPageBridge() {
+    const requestId = `trips-${Date.now()}-${++pageTripRequestId}`;
+
+    return new Promise((resolve) => {
+      const timeoutId = setTimeout(() => {
+        pendingPageTripRequests.delete(requestId);
+        resolve([]);
+      }, 1200);
+
+      pendingPageTripRequests.set(requestId, { resolve, timeoutId });
+      window.postMessage(
+        {
+          source: EXTENSION_SOURCE,
+          type: "WL_READ_PAGE_TRIPS",
+          requestId
+        },
+        "*"
+      );
+    });
+  }
+
+  function cacheTrips(trips, extra = {}) {
+    const normalizedTrips = uniqueTrips(
+      (Array.isArray(trips) ? trips : []).map(normalizeTrip).filter(Boolean)
+    );
+    if (!normalizedTrips.length) {
+      return [];
+    }
+
+    chrome.storage.local.set({
+      [CACHED_TRIPS_KEY]: {
+        trips: normalizedTrips,
+        path: extra.path,
+        source: extra.source,
+        cachedAt: extra.cachedAt || Date.now()
+      }
+    });
+
+    return normalizedTrips;
+  }
+
   async function getTrips() {
     // 1. Check the storage cache (populated by the fetch interceptor
     //    or populateCacheFromPage on previous visits).
@@ -139,16 +227,20 @@
       return cachedData.trips;
     }
 
-    // 2. Read from the live page — window state and DOM links.
-    const pageTrips = extractFromPage();
-    if (pageTrips && pageTrips.length > 0) {
-      chrome.storage.local.set({
-        [CACHED_TRIPS_KEY]: { trips: pageTrips, cachedAt: Date.now() }
-      });
-      return pageTrips;
+    // 2. Ask the page-world bridge. It can see Wanderlog's app state and
+    // fetches, while this isolated extension script can persist the result.
+    const bridgedTrips = await requestTripsFromPageBridge();
+    if (bridgedTrips?.length > 0) {
+      return bridgedTrips;
     }
 
-    // 3. Re-fetch using an endpoint we already saw succeed, or discovered patterns.
+    // 3. Read from the live page DOM available to the extension world.
+    const pageTrips = extractFromPage();
+    if (pageTrips && pageTrips.length > 0) {
+      return cacheTrips(pageTrips, { source: "dom" });
+    }
+
+    // 4. Re-fetch using an endpoint we already saw succeed, or discovered patterns.
     const discoveredPath = [...discovered.entries()]
       .filter(([k, v]) => k.startsWith("GET:") && /trip/i.test(k) && v.lastStatus === 200)
       .sort((a, b) => b[1].count - a[1].count)
@@ -159,12 +251,9 @@
         const res = await originalFetch(discoveredPath, { credentials: "same-origin" });
         if (res.ok) {
           const data = await res.json();
-          const trips = extractTrips(data);
+          const trips = extractTrips(data, discoveredPath);
           if (trips && trips.length > 0) {
-            chrome.storage.local.set({
-              [CACHED_TRIPS_KEY]: { trips, path: discoveredPath, cachedAt: Date.now() }
-            });
-            return trips;
+            return cacheTrips(trips, { path: discoveredPath });
           }
         }
       } catch (_e) {}
@@ -178,8 +267,9 @@
 
   function populateCacheFromPage() {
     // Run after a brief delay to let React finish rendering.
-    setTimeout(() => {
-      const trips = extractFromPage();
+    setTimeout(async () => {
+      const bridgedTrips = await requestTripsFromPageBridge();
+      const trips = bridgedTrips.length > 0 ? bridgedTrips : extractFromPage();
       if (trips && trips.length > 0) {
         chrome.storage.local.get(CACHED_TRIPS_KEY).then((cached) => {
           const existing = cached[CACHED_TRIPS_KEY];
@@ -189,9 +279,7 @@
             trips.length >= existing.trips.length ||
             Date.now() - existing.cachedAt > CACHE_TTL_MS
           ) {
-            chrome.storage.local.set({
-              [CACHED_TRIPS_KEY]: { trips, cachedAt: Date.now() }
-            });
+            cacheTrips(trips, { source: "page-load" });
           }
         });
       }
@@ -241,42 +329,72 @@
     return trips.length > 0 ? trips : null;
   }
 
-  function extractTrips(data) {
+  function extractTrips(data, pathHint = "") {
     if (!data || typeof data !== "object") {
       return null;
     }
 
-    const candidates = [
-      data,
-      data.trips,
-      data.data,
-      data.data?.trips,
-      data.result,
-      data.result?.trips,
-      data.pageProps?.trips
-    ];
+    const trips = [];
+    const seenObjects = new WeakSet();
 
-    for (const candidate of candidates) {
-      if (Array.isArray(candidate) && candidate.length > 0 && candidate[0]?.id) {
-        const trips = candidate.map(normalizeTrip).filter(Boolean);
-        if (trips.length > 0) {
-          return trips;
-        }
+    visit(data, pathHint ? [pathHint] : []);
+    return trips.length > 0 ? uniqueTrips(trips) : null;
+
+    function visit(value, keyPath) {
+      if (!value || typeof value !== "object" || seenObjects.has(value)) {
+        return;
       }
-    }
 
-    return null;
+      seenObjects.add(value);
+
+      if (Array.isArray(value)) {
+        const arrayTrips = value.map(normalizeTrip).filter(Boolean);
+        if (
+          arrayTrips.length > 0 &&
+          keyPath.join(".").match(/trip/i)
+        ) {
+          trips.push(...arrayTrips);
+        }
+
+        value.forEach((item, index) => visit(item, [...keyPath, String(index)]));
+        return;
+      }
+
+      const trip = normalizeTrip(value);
+      if (trip && keyPath.join(".").match(/trip/i)) {
+        trips.push(trip);
+      }
+
+      Object.entries(value).forEach(([key, child]) => {
+        visit(child, [...keyPath, key]);
+      });
+    }
   }
 
   function normalizeTrip(t) {
-    if (!t?.id) {
+    const id = t?.id || t?.tripId || t?.trip_id;
+    const name = t?.name || t?.title || t?.tripName || t?.trip_name;
+
+    if (!id || !name) {
       return null;
     }
 
     return {
-      id: String(t.id),
-      name: t.name || t.title || t.tripName || `Trip ${t.id}`
+      id: String(id),
+      name: String(name).replace(/\s+/g, " ").trim()
     };
+  }
+
+  function uniqueTrips(trips) {
+    const seen = new Set();
+    return trips.filter((trip) => {
+      if (!trip.id || seen.has(trip.id)) {
+        return false;
+      }
+
+      seen.add(trip.id);
+      return true;
+    });
   }
 
   async function createNote(payload) {
