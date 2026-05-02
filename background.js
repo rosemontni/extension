@@ -86,6 +86,30 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
   }
 
+  if (message?.type === "GET_WANDERLOG_TRIPS") {
+    getWanderlogTrips()
+      .then((trips) => sendResponse({ ok: true, trips }))
+      .catch((error) => sendResponse({ ok: false, error: error.message }));
+
+    return true;
+  }
+
+  if (message?.type === "WANDERLOG_SEND_CLIP") {
+    sendClipToWanderlog(message.payload)
+      .then((result) => sendResponse({ ok: true, result }))
+      .catch((error) => sendResponse({ ok: false, error: error.message }));
+
+    return true;
+  }
+
+  if (message?.type === "WANDERLOG_SEND_DESTINATIONS") {
+    sendDestinationsToWanderlog(message.payload)
+      .then((result) => sendResponse({ ok: true, result }))
+      .catch((error) => sendResponse({ ok: false, error: error.message }));
+
+    return true;
+  }
+
   return undefined;
 });
 
@@ -249,4 +273,110 @@ function buildWanderlogMapUrl(search) {
   const url = new URL(WANDERLOG_MAP_URL);
   url.searchParams.set("search", search);
   return url.toString();
+}
+
+// --- Direct Wanderlog write support ---
+
+async function getWanderlogTrips() {
+  // Try reading trips directly from background via credentialed fetch first.
+  // This works for the geo API and may work for trips too.
+  const candidates = [
+    `${WANDERLOG_APP_URL}/api/trips`,
+    `${WANDERLOG_APP_URL}/api/v1/trips`,
+    `${WANDERLOG_APP_URL}/api/v2/trips`,
+    `${WANDERLOG_APP_URL}/api/user/trips`
+  ];
+
+  for (const url of candidates) {
+    try {
+      const res = await fetch(url, { credentials: "include" });
+      if (res.ok) {
+        const data = await res.json();
+        const trips = extractTripsFromResponse(data);
+        if (trips && trips.length > 0) {
+          return trips;
+        }
+      }
+    } catch (_e) {}
+  }
+
+  // Fall back to content script proxy in an open Wanderlog tab.
+  const tabId = await ensureWanderlogAppTab({ background: true });
+  return proxyToWanderlogTab(tabId, { type: "WL_GET_TRIPS" }, "trips");
+}
+
+async function sendClipToWanderlog(payload) {
+  const tabId = await ensureWanderlogAppTab({ background: false });
+  return proxyToWanderlogTab(tabId, { type: "WL_CREATE_NOTE", payload }, "result");
+}
+
+async function sendDestinationsToWanderlog(payload) {
+  const tabId = await ensureWanderlogAppTab({ background: false });
+  return proxyToWanderlogTab(tabId, { type: "WL_ADD_DESTINATIONS", payload }, "result");
+}
+
+function extractTripsFromResponse(data) {
+  const candidates = [
+    data,
+    data?.trips,
+    data?.data,
+    data?.data?.trips,
+    data?.result,
+    data?.result?.trips
+  ];
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate) && candidate.length > 0 && candidate[0]?.id) {
+      return candidate
+        .map((t) => ({
+          id: String(t.id),
+          name: t.name || t.title || t.tripName || `Trip ${t.id}`
+        }))
+        .filter((t) => t.id);
+    }
+  }
+
+  return null;
+}
+
+async function ensureWanderlogAppTab({ background }) {
+  const tabs = await chrome.tabs.query({ url: "https://app.wanderlog.com/*" });
+  const activeTab = tabs.find((t) => !t.discarded);
+
+  if (activeTab) {
+    return activeTab.id;
+  }
+
+  if (background) {
+    throw new Error(
+      "Open app.wanderlog.com in a tab so the extension can read your trips."
+    );
+  }
+
+  const newTab = await chrome.tabs.create({ url: WANDERLOG_APP_URL, active: true });
+  // Wait for the content script to initialize after page load.
+  await new Promise((resolve) => setTimeout(resolve, 3500));
+  return newTab.id;
+}
+
+async function proxyToWanderlogTab(tabId, message, resultKey) {
+  let response;
+
+  try {
+    response = await chrome.tabs.sendMessage(tabId, message);
+  } catch (_e) {
+    // Content script may not be ready yet; inject and retry once.
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      files: ["wanderlog-app.js"]
+    });
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    response = await chrome.tabs.sendMessage(tabId, message);
+  }
+
+  if (!response?.ok) {
+    throw new Error(response?.error || `Wanderlog returned an unexpected response.`);
+  }
+
+  return response[resultKey];
 }

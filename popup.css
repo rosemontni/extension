@@ -208,6 +208,17 @@ button:focus {
   gap: 10px;
 }
 
+.trip-select-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.trip-select-row select {
+  min-width: 0;
+}
+
 .button-row.three-up {
   grid-template-columns: 1fr 1fr 1fr;
 }

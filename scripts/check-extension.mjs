@@ -5,13 +5,14 @@ const files = [
   "manifest.json",
   "background.js",
   "content.js",
+  "wanderlog-app.js",
   "popup.html",
   "popup.css",
   "popup.js",
   "lib/wanderlog-utils.js"
 ];
 
-const jsFiles = ["background.js", "content.js", "popup.js", "lib/wanderlog-utils.js"];
+const jsFiles = ["background.js", "content.js", "wanderlog-app.js", "popup.js", "lib/wanderlog-utils.js"];
 const requiredPermissions = [
   "activeTab",
   "clipboardWrite",

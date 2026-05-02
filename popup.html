@@ -32,9 +32,14 @@
           <a id="clip-source-url" href="#" target="_blank" rel="noreferrer"></a>
         </div>
         <div class="form-grid">
-          <label>
-            <span class="label">Trip</span>
-            <input id="clip-trip-input" list="recent-trip-list" type="text" placeholder="E.g. Japan 2026" />
+          <label class="wide-field">
+            <span class="label">Send to trip</span>
+            <div class="trip-select-row">
+              <select id="clip-trip-select" disabled>
+                <option value="">— select a trip —</option>
+              </select>
+              <button id="load-trips-button" class="secondary-button" type="button">Load trips</button>
+            </div>
           </label>
           <label>
             <span class="label">Note type</span>
@@ -60,14 +65,21 @@
             <span class="label">Optional label</span>
             <input id="clip-target-input" type="text" placeholder="Place, day, or list" />
           </label>
+          <label>
+            <span class="label">Trip label (local)</span>
+            <input id="clip-trip-input" list="recent-trip-list" type="text" placeholder="E.g. Japan 2026" />
+          </label>
         </div>
         <label class="checkbox-row">
           <input id="clip-include-source" type="checkbox" checked />
           <span>Include source URL</span>
         </label>
         <div class="actions">
-          <div class="button-row three-up">
-            <button id="save-clip-button" type="button">Save clip</button>
+          <div class="button-row">
+            <button id="send-to-wanderlog-button" type="button" disabled>Send to Wanderlog</button>
+            <button id="save-clip-button" class="secondary-button" type="button">Save locally</button>
+          </div>
+          <div class="button-row">
             <button id="copy-note-button" class="secondary-button" type="button">Copy note</button>
             <button id="open-wanderlog-button" class="secondary-button" type="button">Open Wanderlog</button>
           </div>
@@ -128,8 +140,11 @@
             <button id="check-import-button" class="secondary-button" type="button">Check matches</button>
           </div>
           <ul id="import-list" class="import-list"></ul>
-          <div class="button-row three-up">
-            <button id="save-import-button" type="button">Save import</button>
+          <div class="button-row">
+            <button id="send-import-button" type="button" disabled>Send to Wanderlog</button>
+            <button id="save-import-button" class="secondary-button" type="button">Save locally</button>
+          </div>
+          <div class="button-row">
             <button id="copy-import-button" class="secondary-button" type="button">Copy list</button>
             <button id="open-import-wanderlog-button" class="secondary-button" type="button">Open Wanderlog</button>
           </div>

@@ -32,6 +32,9 @@ const clipLength = document.getElementById("clip-length");
 const clipSourceTitle = document.getElementById("clip-source-title");
 const clipSourceUrl = document.getElementById("clip-source-url");
 const clipTripInput = document.getElementById("clip-trip-input");
+const clipTripSelect = document.getElementById("clip-trip-select");
+const loadTripsButton = document.getElementById("load-trips-button");
+const sendToWanderlogButton = document.getElementById("send-to-wanderlog-button");
 const clipNoteType = document.getElementById("clip-note-type");
 const clipDestinationType = document.getElementById("clip-destination-type");
 const clipTargetInput = document.getElementById("clip-target-input");
@@ -50,6 +53,7 @@ const importTargetType = document.getElementById("import-target-type");
 const importTargetInput = document.getElementById("import-target-input");
 const parseImportButton = document.getElementById("parse-import-button");
 const checkImportButton = document.getElementById("check-import-button");
+const sendImportButton = document.getElementById("send-import-button");
 const saveImportButton = document.getElementById("save-import-button");
 const copyImportButton = document.getElementById("copy-import-button");
 const openImportWanderlogButton = document.getElementById("open-import-wanderlog-button");
@@ -83,6 +87,18 @@ clipText.addEventListener("input", () => {
   updateClipLength();
 });
 
+loadTripsButton.addEventListener("click", () => {
+  loadWanderlogTrips();
+});
+
+clipTripSelect.addEventListener("change", () => {
+  sendToWanderlogButton.disabled = !clipTripSelect.value;
+});
+
+sendToWanderlogButton.addEventListener("click", () => {
+  sendClipToWanderlog();
+});
+
 saveClipButton.addEventListener("click", () => {
   saveClipLocally();
 });
@@ -108,6 +124,10 @@ parseImportButton.addEventListener("click", () => {
 
 checkImportButton.addEventListener("click", () => {
   checkImportMatches();
+});
+
+sendImportButton.addEventListener("click", () => {
+  sendImportToWanderlog();
 });
 
 saveImportButton.addEventListener("click", () => {
@@ -451,6 +471,7 @@ function renderImportPreview() {
   const counts = getImportCounts(importItems);
   importCount.textContent = `${counts.usable}/${counts.total}`;
   checkImportButton.disabled = counts.usable === 0;
+  sendImportButton.disabled = counts.usable === 0;
   saveImportButton.disabled = counts.usable === 0;
   copyImportButton.disabled = counts.usable === 0;
 
@@ -699,6 +720,7 @@ function setButtonsDisabled(disabled) {
 function setImportButtonsDisabled(disabled) {
   parseImportButton.disabled = disabled;
   checkImportButton.disabled = disabled;
+  sendImportButton.disabled = disabled;
   saveImportButton.disabled = disabled;
   copyImportButton.disabled = disabled;
 }
@@ -715,6 +737,137 @@ function getSuccessMessage(kind, result) {
   return result?.mode === "tab"
     ? "Opened Wanderlog in a tab."
     : "Opened Wanderlog on this page.";
+}
+
+async function loadWanderlogTrips() {
+  loadTripsButton.disabled = true;
+  clipTripSelect.disabled = true;
+  clipStatusText.textContent = "Loading your Wanderlog trips...";
+
+  try {
+    const response = await chrome.runtime.sendMessage({ type: "GET_WANDERLOG_TRIPS" });
+
+    if (!response?.ok) {
+      throw new Error(response?.error || "Could not load trips.");
+    }
+
+    const trips = response.trips || [];
+    clipTripSelect.innerHTML =
+      '<option value="">— select a trip —</option>' +
+      trips.map((t) => `<option value="${escapeHtml(t.id)}">${escapeHtml(t.name)}</option>`).join("");
+
+    clipTripSelect.disabled = false;
+    sendToWanderlogButton.disabled = true;
+    clipStatusText.textContent = `${trips.length} trip${trips.length === 1 ? "" : "s"} loaded. Pick one to send the note directly.`;
+  } catch (error) {
+    clipTripSelect.innerHTML = '<option value="">— could not load trips —</option>';
+    clipStatusText.textContent = error.message || "Could not load trips.";
+  } finally {
+    loadTripsButton.disabled = false;
+  }
+}
+
+async function sendClipToWanderlog() {
+  const tripId = clipTripSelect.value;
+  if (!tripId) {
+    clipStatusText.textContent = "Select a trip first.";
+    return;
+  }
+
+  sendToWanderlogButton.disabled = true;
+  clipStatusText.textContent = "Sending note to Wanderlog...";
+
+  try {
+    const clip = buildClipFromForm();
+    const response = await chrome.runtime.sendMessage({
+      type: "WANDERLOG_SEND_CLIP",
+      payload: {
+        tripId,
+        text: clip.selectedText,
+        noteType: clip.noteType,
+        sourceTitle: clip.sourceTitle,
+        sourceUrl: clip.sourceUrl,
+        includeSourceUrl: clip.includeSourceUrl
+      }
+    });
+
+    if (!response?.ok) {
+      throw new Error(response?.error || "Could not send note to Wanderlog.");
+    }
+
+    // Also save locally so it appears in recent activity.
+    const data = await chrome.storage.local.get([CLIPS_STORAGE_KEY, RECENT_TRIPS_KEY]);
+    const clips = Array.isArray(data[CLIPS_STORAGE_KEY]) ? data[CLIPS_STORAGE_KEY] : [];
+    const recentTrips = Array.isArray(data[RECENT_TRIPS_KEY]) ? data[RECENT_TRIPS_KEY] : [];
+    const savedClip = { ...clip, status: "sent", sentAt: new Date().toISOString() };
+    const tripName = clipTripSelect.options[clipTripSelect.selectedIndex]?.text || "";
+    await chrome.storage.local.set({
+      [CLIPS_STORAGE_KEY]: [savedClip, ...clips].slice(0, 100),
+      [RECENT_TRIPS_KEY]: addRecentTrip(recentTrips, tripName)
+    });
+    await chrome.storage.local.remove(PENDING_CLIP_KEY);
+
+    currentClip = null;
+    clipCard.classList.add("hidden");
+    clipStatusText.textContent = "";
+    renderEntries(await getEntries());
+    setStatus(`Note sent to "${tripName}" in Wanderlog.`);
+  } catch (error) {
+    clipStatusText.textContent = error.message || "Could not send note.";
+    sendToWanderlogButton.disabled = false;
+  }
+}
+
+async function sendImportToWanderlog() {
+  const tripId = importTripInput.value.trim();
+  if (!tripId) {
+    importStatusText.textContent = "Enter a trip name or ID to send destinations directly.";
+    return;
+  }
+
+  const usableItems = importItems.filter(
+    (item) => item.included !== false && item.status !== "duplicate"
+  );
+
+  if (!usableItems.length) {
+    importStatusText.textContent = "Preview at least one usable destination first.";
+    return;
+  }
+
+  const matchedItems = usableItems.filter((item) => item.geoId);
+  if (!matchedItems.length) {
+    importStatusText.textContent = 'Run "Check matches" first so destinations have Wanderlog geo IDs.';
+    return;
+  }
+
+  setImportButtonsDisabled(true);
+  importStatusText.textContent = `Sending ${matchedItems.length} destination${matchedItems.length === 1 ? "" : "s"} to Wanderlog...`;
+
+  try {
+    const response = await chrome.runtime.sendMessage({
+      type: "WANDERLOG_SEND_DESTINATIONS",
+      payload: {
+        tripId,
+        items: matchedItems.map((item) => ({ geoId: item.geoId, name: item.matchedName || item.name }))
+      }
+    });
+
+    if (!response?.ok) {
+      throw new Error(response?.error || "Could not send destinations to Wanderlog.");
+    }
+
+    const result = response.result || {};
+    const added = result.added?.length || 0;
+    const failed = result.failed?.length || 0;
+    importStatusText.textContent =
+      `Sent ${added} destination${added === 1 ? "" : "s"} to Wanderlog` +
+      (failed > 0 ? `, ${failed} failed.` : ".");
+    renderEntries(await getEntries());
+  } catch (error) {
+    importStatusText.textContent = error.message || "Could not send destinations.";
+  } finally {
+    setImportButtonsDisabled(false);
+  }
 }
 
 function openWanderlogApp() {
