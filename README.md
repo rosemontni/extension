@@ -9,13 +9,21 @@
 [![License](https://img.shields.io/badge/license-Apache--2.0-green.svg)](LICENSE)
 [![Manifest V3](https://img.shields.io/badge/Chrome-Manifest%20V3-f6a03d.svg)](manifest.json)
 
-Wanderlog Notes Clipper is a Manifest V3 Chrome extension that sends places, notes, and destination lists **directly into your Wanderlog trips** — no copy-pasting required.
+Wanderlog Notes Clipper is a Manifest V3 Chrome extension that saves places, selected travel notes, and bulk destination lists **directly into your Wanderlog trips** — no copy-pasting required.
 
 The promotional banner in `assets/wanderlog-notes-banner.png` was generated with GPT Image 2.
 
 ![Popup note clipping workflow](docs/screenshots/popup-note-flow.png)
 
 ![Bulk destination importer workflow](docs/screenshots/bulk-import-flow.png)
+
+## At a Glance
+
+- Save places from any webpage into Wanderlog's authenticated save panel.
+- Turn highlighted travel advice into editable trip notes with source attribution.
+- Paste destination lists, clean duplicates, preview matches, and send them to a selected trip.
+- Reuse your existing Wanderlog browser session; the extension never asks for or stores your password.
+- Keep Copy fallbacks available when Wanderlog's private web API changes.
 
 ## Features
 
@@ -71,13 +79,13 @@ After visiting app.wanderlog.com, the popup pre-populates the trip selector auto
 5. Click **Send to Wanderlog** — all previewed places are added to that trip's places directly.
 6. Use **Copy list** if you prefer to paste the destinations into Wanderlog manually.
 
-## How Direct Write Works
+## Privacy and Direct Write
 
-Wanderlog does not publish a write API. This extension discovers Wanderlog's internal API by running a content script on `app.wanderlog.com` that intercepts the fetch calls the Wanderlog web app makes as you browse. Discovered endpoint patterns are stored locally and reused for subsequent writes.
+Wanderlog does not publish a write API. This extension discovers Wanderlog's internal API by running a page-context bridge on `app.wanderlog.com` that observes the fetch calls the Wanderlog web app makes as you browse. Discovered endpoint patterns are stored locally and reused for subsequent writes.
 
 When you click **Send to Wanderlog**, the extension routes the request through that content script, which makes same-origin authenticated calls using the same session Wanderlog already holds. No credentials are stored or transmitted outside your browser.
 
-Trip data is read in three ways, in order: from a local cache populated the last time you browsed Wanderlog, from the live page state and sidebar DOM of any open Wanderlog tab, and by proxying a request through an open tab if the cache is stale. If none of those paths succeed, the extension tells you to open Wanderlog first rather than failing silently.
+Trip data is read in four ways, in order: from a local cache populated the last time you browsed Wanderlog, from the live page state visible to the page-context bridge, from trip links in the Wanderlog sidebar DOM, and by proxying a request through an open Wanderlog tab if the cache is stale. If none of those paths succeed, the extension tells you to open Wanderlog first rather than failing silently.
 
 If a write fails (the internal API may change between Wanderlog releases), **Copy** is always available as a manual fallback.
 
