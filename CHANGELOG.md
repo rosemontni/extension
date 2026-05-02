@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.6.0 - 2026-05-02
+
+- Fixed selected-text note trip loading by adding a page-context bridge that can read Wanderlog's live app state and fetch activity from `app.wanderlog.com`.
+- Improved Reload reliability for trip selectors with short background retries, manual bridge injection, and a stale-cache fallback when the Wanderlog tab is still hydrating.
+- Added bridge coverage to `npm test` and included `wanderlog-page-bridge.js` in release ZIP packaging.
+- Refreshed public-facing README and GitHub About metadata to describe direct trip writes, privacy behavior, and the current clipper workflow.
+
 ## v0.5.0 - 2026-05-02
 
 - Removed Save locally from both the clip card and bulk importer — it stored data with no follow-up action and has been replaced by Send to Wanderlog as the primary path and Copy as the manual fallback.

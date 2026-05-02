@@ -1,6 +1,6 @@
 {
   "name": "wanderlog-notes-clipper",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "private": true,
   "description": "Chrome extension for saving Wanderlog places, destinations, and selected-text travel notes.",
   "license": "Apache-2.0",
