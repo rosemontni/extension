@@ -208,6 +208,10 @@ button:focus {
   gap: 10px;
 }
 
+.button-row.single {
+  grid-template-columns: 1fr;
+}
+
 .trip-select-row {
   display: grid;
   grid-template-columns: 1fr auto;

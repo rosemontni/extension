@@ -40,7 +40,6 @@ const clipDestinationType = document.getElementById("clip-destination-type");
 const clipTargetInput = document.getElementById("clip-target-input");
 const clipIncludeSource = document.getElementById("clip-include-source");
 const recentTripList = document.getElementById("recent-trip-list");
-const saveClipButton = document.getElementById("save-clip-button");
 const copyNoteButton = document.getElementById("copy-note-button");
 const openWanderlogButton = document.getElementById("open-wanderlog-button");
 const cancelClipButton = document.getElementById("cancel-clip-button");
@@ -56,7 +55,6 @@ const importTargetInput = document.getElementById("import-target-input");
 const parseImportButton = document.getElementById("parse-import-button");
 const checkImportButton = document.getElementById("check-import-button");
 const sendImportButton = document.getElementById("send-import-button");
-const saveImportButton = document.getElementById("save-import-button");
 const copyImportButton = document.getElementById("copy-import-button");
 const openImportWanderlogButton = document.getElementById("open-import-wanderlog-button");
 const clearImportButton = document.getElementById("clear-import-button");
@@ -101,10 +99,6 @@ sendToWanderlogButton.addEventListener("click", () => {
   sendClipToWanderlog();
 });
 
-saveClipButton.addEventListener("click", () => {
-  saveClipLocally();
-});
-
 copyNoteButton.addEventListener("click", () => {
   copyFormattedNote();
 });
@@ -138,10 +132,6 @@ importTripSelect.addEventListener("change", () => {
 
 sendImportButton.addEventListener("click", () => {
   sendImportToWanderlog();
-});
-
-saveImportButton.addEventListener("click", () => {
-  saveDestinationImport();
 });
 
 copyImportButton.addEventListener("click", () => {
@@ -391,31 +381,6 @@ function renderImportEntry(entry) {
   `;
 }
 
-async function saveClipLocally() {
-  try {
-    const clip = buildClipFromForm();
-    const data = await chrome.storage.local.get([CLIPS_STORAGE_KEY, RECENT_TRIPS_KEY]);
-    const clips = Array.isArray(data[CLIPS_STORAGE_KEY]) ? data[CLIPS_STORAGE_KEY] : [];
-    const recentTrips = Array.isArray(data[RECENT_TRIPS_KEY]) ? data[RECENT_TRIPS_KEY] : [];
-
-    const nextClips = [clip, ...clips].slice(0, 100);
-    const nextTrips = addRecentTrip(recentTrips, clip.tripLabel);
-
-    await chrome.storage.local.set({
-      [CLIPS_STORAGE_KEY]: nextClips,
-      [RECENT_TRIPS_KEY]: nextTrips
-    });
-    await chrome.storage.local.remove(PENDING_CLIP_KEY);
-
-    currentClip = clip;
-    renderRecentTrips(nextTrips);
-    clipStatusText.textContent = "Clip saved locally. Use Copy note to paste it into Wanderlog.";
-    renderEntries(await getEntries());
-  } catch (error) {
-    clipStatusText.textContent = error.message || "Could not save clip.";
-  }
-}
-
 async function copyFormattedNote() {
   try {
     const clip = buildClipFromForm();
@@ -490,7 +455,6 @@ function renderImportPreview() {
   importCount.textContent = `${counts.usable}/${counts.total}`;
   checkImportButton.disabled = counts.usable === 0;
   sendImportButton.disabled = counts.usable === 0;
-  saveImportButton.disabled = counts.usable === 0;
   copyImportButton.disabled = counts.usable === 0;
 
   if (!importItems.length) {
@@ -582,29 +546,6 @@ async function checkImportMatches() {
   } finally {
     setImportButtonsDisabled(false);
     renderImportPreview();
-  }
-}
-
-async function saveDestinationImport() {
-  try {
-    const session = buildDestinationImportSession();
-    const data = await chrome.storage.local.get([IMPORTS_STORAGE_KEY, RECENT_TRIPS_KEY]);
-    const imports = Array.isArray(data[IMPORTS_STORAGE_KEY]) ? data[IMPORTS_STORAGE_KEY] : [];
-    const recentTrips = Array.isArray(data[RECENT_TRIPS_KEY]) ? data[RECENT_TRIPS_KEY] : [];
-    const nextTrips = addRecentTrip(recentTrips, session.tripLabel);
-
-    await chrome.storage.local.set({
-      [IMPORTS_STORAGE_KEY]: [session, ...imports].slice(0, 25),
-      [RECENT_TRIPS_KEY]: nextTrips
-    });
-
-    recentImportedDestinations = await getRecentImportedDestinations();
-    renderRecentTrips(nextTrips);
-    importStatusText.textContent =
-      "Import saved locally. Copy the list or open Wanderlog to add it manually.";
-    renderEntries(await getEntries());
-  } catch (error) {
-    importStatusText.textContent = error.message || "Could not save import.";
   }
 }
 
@@ -739,7 +680,6 @@ function setImportButtonsDisabled(disabled) {
   parseImportButton.disabled = disabled;
   checkImportButton.disabled = disabled;
   sendImportButton.disabled = disabled;
-  saveImportButton.disabled = disabled;
   copyImportButton.disabled = disabled;
 }
 
@@ -906,11 +846,15 @@ async function sendImportToWanderlog() {
       `Added ${added} place${added === 1 ? "" : "s"} to "${tripName}"` +
       (failed > 0 ? ` — ${failed} could not be added.` : ".");
 
-    const data = await chrome.storage.local.get(RECENT_TRIPS_KEY);
-    const recentTrips = Array.isArray(data[RECENT_TRIPS_KEY]) ? data[RECENT_TRIPS_KEY] : [];
+    const session = buildDestinationImportSession();
+    const stored = await chrome.storage.local.get([IMPORTS_STORAGE_KEY, RECENT_TRIPS_KEY]);
+    const imports = Array.isArray(stored[IMPORTS_STORAGE_KEY]) ? stored[IMPORTS_STORAGE_KEY] : [];
+    const recentTrips = Array.isArray(stored[RECENT_TRIPS_KEY]) ? stored[RECENT_TRIPS_KEY] : [];
     await chrome.storage.local.set({
+      [IMPORTS_STORAGE_KEY]: [{ ...session, status: "sent", sentAt: new Date().toISOString() }, ...imports].slice(0, 25),
       [RECENT_TRIPS_KEY]: addRecentTrip(recentTrips, tripName)
     });
+    recentImportedDestinations = await getRecentImportedDestinations();
 
     renderEntries(await getEntries());
   } catch (error) {
