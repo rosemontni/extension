@@ -309,24 +309,43 @@
       } catch (_e) {}
     }
 
-    // Scrape trip links from the page DOM — Wanderlog's sidebar lists trips
-    // as anchor elements whose href contains "/trip/<id>".
+    // Scrape trip links from the page DOM — Wanderlog's sidebar has used
+    // a few route shapes over time, so accept the known trip-like variants.
     const seen = new Set();
     const trips = [];
 
-    document.querySelectorAll('a[href*="/trip/"]').forEach((link) => {
-      const match = link.pathname.match(/^\/trip\/([^/?#]+)/);
-      if (!match || seen.has(match[1])) {
-        return;
-      }
-      const name = link.textContent?.trim();
-      if (name && name.length > 0 && name.length < 120) {
-        seen.add(match[1]);
-        trips.push({ id: match[1], name });
-      }
-    });
+    document
+      .querySelectorAll(
+        'a[href*="/trip/"], a[href*="/view/"], a[href*="/plan/"], a[href*="tripId="], a[href*="trip_id="]'
+      )
+      .forEach((link) => {
+        const id = getTripIdFromLink(link);
+        if (!id || seen.has(id)) {
+          return;
+        }
+        const name = link.textContent?.trim();
+        if (name && name.length > 0 && name.length < 120) {
+          seen.add(id);
+          trips.push({ id, name });
+        }
+      });
 
     return trips.length > 0 ? trips : null;
+  }
+
+  function getTripIdFromLink(link) {
+    try {
+      const url = new URL(link.href, window.location.origin);
+      const pathMatch = url.pathname.match(/^\/(?:trip|view|plan)\/([^/?#]+)/);
+      const pathId = pathMatch?.[1] || "";
+      if (["create", "new", "start"].includes(pathId.toLowerCase())) {
+        return "";
+      }
+
+      return pathId || url.searchParams.get("tripId") || url.searchParams.get("trip_id") || "";
+    } catch (_error) {
+      return "";
+    }
   }
 
   function extractTrips(data, pathHint = "") {
@@ -351,7 +370,7 @@
         const arrayTrips = value.map(normalizeTrip).filter(Boolean);
         if (
           arrayTrips.length > 0 &&
-          keyPath.join(".").match(/trip/i)
+          (keyPath.join(".").match(/trip/i) || value.some(hasTripSpecificFields))
         ) {
           trips.push(...arrayTrips);
         }
@@ -372,8 +391,15 @@
   }
 
   function normalizeTrip(t) {
-    const id = t?.id || t?.tripId || t?.trip_id;
-    const name = t?.name || t?.title || t?.tripName || t?.trip_name;
+    const id = t?.id || t?.tripId || t?.trip_id || t?.planId || t?.plan_id;
+    const name =
+      t?.name ||
+      t?.title ||
+      t?.displayName ||
+      t?.tripName ||
+      t?.trip_name ||
+      t?.planName ||
+      t?.plan_name;
 
     if (!id || !name) {
       return null;
@@ -395,6 +421,23 @@
       seen.add(trip.id);
       return true;
     });
+  }
+
+  function hasTripSpecificFields(value) {
+    if (!value || typeof value !== "object") {
+      return false;
+    }
+
+    return Boolean(
+      value.tripId ||
+        value.trip_id ||
+        value.tripName ||
+        value.trip_name ||
+        value.planId ||
+        value.plan_id ||
+        value.planName ||
+        value.plan_name
+    );
   }
 
   async function createNote(payload) {

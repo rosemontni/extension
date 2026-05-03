@@ -3,3 +3,4 @@ dist/
 *.crx
 *.pem
 node_modules/
+.tmp-*/

@@ -126,16 +126,20 @@
     const seen = new Set();
     const trips = [];
 
-    document.querySelectorAll('a[href*="/trip/"], a[href*="tripId="]').forEach((link) => {
-      const tripId = getTripIdFromLink(link);
-      const name = link.textContent?.replace(/\s+/g, " ").trim();
-      if (!tripId || !name || name.length > 120 || seen.has(tripId)) {
-        return;
-      }
+    document
+      .querySelectorAll(
+        'a[href*="/trip/"], a[href*="/view/"], a[href*="/plan/"], a[href*="tripId="], a[href*="trip_id="]'
+      )
+      .forEach((link) => {
+        const tripId = getTripIdFromLink(link);
+        const name = link.textContent?.replace(/\s+/g, " ").trim();
+        if (!tripId || !name || name.length > 120 || seen.has(tripId)) {
+          return;
+        }
 
-      seen.add(tripId);
-      trips.push({ id: tripId, name });
-    });
+        seen.add(tripId);
+        trips.push({ id: tripId, name });
+      });
 
     return trips;
   }
@@ -143,8 +147,13 @@
   function getTripIdFromLink(link) {
     try {
       const url = new URL(link.href, window.location.origin);
-      const pathMatch = url.pathname.match(/\/trip\/([^/?#]+)/);
-      return pathMatch?.[1] || url.searchParams.get("tripId") || "";
+      const pathMatch = url.pathname.match(/\/(?:trip|view|plan)\/([^/?#]+)/);
+      const pathId = pathMatch?.[1] || "";
+      if (["create", "new", "start"].includes(pathId.toLowerCase())) {
+        return "";
+      }
+
+      return pathId || url.searchParams.get("tripId") || url.searchParams.get("trip_id") || "";
     } catch (_error) {
       return "";
     }
@@ -210,9 +219,10 @@
     }
   }
 
-  function looksLikeTripCollection(_originalItems, normalizedTrips, keyPath) {
+  function looksLikeTripCollection(originalItems, normalizedTrips, keyPath) {
     const keyHint = /trip/i.test(keyPath.join("."));
-    return keyHint && normalizedTrips.length > 0;
+    const tripSpecific = originalItems.some(hasTripSpecificFields);
+    return normalizedTrips.length > 0 && (keyHint || tripSpecific);
   }
 
   function normalizeTrip(value) {
@@ -220,8 +230,15 @@
       return null;
     }
 
-    const id = value.id || value.tripId || value.trip_id;
-    const name = value.name || value.title || value.tripName || value.trip_name;
+    const id = value.id || value.tripId || value.trip_id || value.planId || value.plan_id;
+    const name =
+      value.name ||
+      value.title ||
+      value.displayName ||
+      value.tripName ||
+      value.trip_name ||
+      value.planName ||
+      value.plan_name;
     if (!id || !name) {
       return null;
     }
@@ -230,6 +247,23 @@
       id: String(id),
       name: String(name).replace(/\s+/g, " ").trim()
     };
+  }
+
+  function hasTripSpecificFields(value) {
+    if (!value || typeof value !== "object") {
+      return false;
+    }
+
+    return Boolean(
+      value.tripId ||
+        value.trip_id ||
+        value.tripName ||
+        value.trip_name ||
+        value.planId ||
+        value.plan_id ||
+        value.planName ||
+        value.plan_name
+    );
   }
 
   function uniqueById(trips) {

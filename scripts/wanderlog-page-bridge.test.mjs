@@ -91,7 +91,7 @@ const context = vm.createContext({
 
 vm.runInContext(bridgeSource, context, { filename: "wanderlog-page-bridge.js" });
 
-await window.fetch("/api/trips/bootstrap", { method: "GET" });
+await window.fetch("/api/bootstrap", { method: "GET" });
 await new Promise((resolve) => setTimeout(resolve, 0));
 
 assert.deepEqual(

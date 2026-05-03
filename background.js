@@ -279,6 +279,14 @@ function buildWanderlogMapUrl(search) {
 
 const CACHED_TRIPS_KEY = "wanderlogCachedTrips";
 const CACHE_TTL_MS = 10 * 60 * 1000;
+const TRIP_API_CANDIDATES = [
+  "/api/trips",
+  "/api/user/trips",
+  "/api/users/me/trips",
+  "/api/me/trips",
+  "/api/v1/trips",
+  "/api/v2/trips"
+];
 
 async function getWanderlogTrips() {
   // 1. Use trips cached by the app.wanderlog.com content script — populated
@@ -307,14 +315,56 @@ async function getWanderlogTrips() {
     }
   }
 
+  // 3. Try direct authenticated API reads from the extension service worker.
+  //    This helps Reload do useful work even when no Wanderlog tab is open.
+  const directTrips = await fetchTripsFromWanderlogApi();
+  if (directTrips?.length > 0) {
+    await chrome.storage.local.set({
+      [CACHED_TRIPS_KEY]: { trips: directTrips, source: "background-api", cachedAt: Date.now() }
+    });
+    return directTrips;
+  }
+
   if (staleTrips) {
     return staleTrips;
   }
 
-  // 3. No cached data and no open tab — tell the user what to do.
+  // 4. No cached data and no open tab — tell the user what to do.
   throw new Error(
     "Open app.wanderlog.com and browse to one of your trips, then click Reload in the extension."
   );
+}
+
+async function fetchTripsFromWanderlogApi() {
+  for (const path of TRIP_API_CANDIDATES) {
+    try {
+      const response = await fetchWithTimeout(`${WANDERLOG_APP_URL}${path}`, {
+        credentials: "include"
+      }, 1200);
+      if (!response.ok) {
+        continue;
+      }
+
+      const data = await response.json();
+      const trips = extractTripsFromResponse(data, path);
+      if (trips?.length > 0) {
+        return trips;
+      }
+    } catch (_error) {}
+  }
+
+  return null;
+}
+
+async function fetchWithTimeout(url, options, timeoutMs) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 async function sendClipToWanderlog(payload) {
@@ -327,28 +377,96 @@ async function sendDestinationsToWanderlog(payload) {
   return proxyToWanderlogTab(tabId, { type: "WL_ADD_DESTINATIONS", payload }, "result");
 }
 
-function extractTripsFromResponse(data) {
-  const candidates = [
-    data,
-    data?.trips,
-    data?.data,
-    data?.data?.trips,
-    data?.result,
-    data?.result?.trips
-  ];
-
-  for (const candidate of candidates) {
-    if (Array.isArray(candidate) && candidate.length > 0 && candidate[0]?.id) {
-      return candidate
-        .map((t) => ({
-          id: String(t.id),
-          name: t.name || t.title || t.tripName || `Trip ${t.id}`
-        }))
-        .filter((t) => t.id);
-    }
+function extractTripsFromResponse(data, pathHint = "") {
+  if (!data || typeof data !== "object") {
+    return null;
   }
 
-  return null;
+  const trips = [];
+  const seenObjects = new WeakSet();
+
+  visit(data, pathHint ? [pathHint] : []);
+  return trips.length > 0 ? uniqueTrips(trips) : null;
+
+  function visit(value, keyPath) {
+    if (!value || typeof value !== "object" || seenObjects.has(value)) {
+      return;
+    }
+
+    seenObjects.add(value);
+
+    if (Array.isArray(value)) {
+      const arrayTrips = value.map(normalizeTrip).filter(Boolean);
+      if (
+        arrayTrips.length > 0 &&
+        (keyPath.join(".").match(/trip/i) || value.some(hasTripSpecificFields))
+      ) {
+        trips.push(...arrayTrips);
+      }
+
+      value.forEach((item, index) => visit(item, [...keyPath, String(index)]));
+      return;
+    }
+
+    const trip = normalizeTrip(value);
+    if (trip && keyPath.join(".").match(/trip/i)) {
+      trips.push(trip);
+    }
+
+    Object.entries(value).forEach(([key, child]) => {
+      visit(child, [...keyPath, key]);
+    });
+  }
+}
+
+function normalizeTrip(value) {
+  const id = value?.id || value?.tripId || value?.trip_id || value?.planId || value?.plan_id;
+  const name =
+    value?.name ||
+    value?.title ||
+    value?.displayName ||
+    value?.tripName ||
+    value?.trip_name ||
+    value?.planName ||
+    value?.plan_name;
+
+  if (!id || !name) {
+    return null;
+  }
+
+  return {
+    id: String(id),
+    name: String(name).replace(/\s+/g, " ").trim()
+  };
+}
+
+function hasTripSpecificFields(value) {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  return Boolean(
+    value.tripId ||
+      value.trip_id ||
+      value.tripName ||
+      value.trip_name ||
+      value.planId ||
+      value.plan_id ||
+      value.planName ||
+      value.plan_name
+  );
+}
+
+function uniqueTrips(trips) {
+  const seen = new Set();
+  return trips.filter((trip) => {
+    if (!trip.id || seen.has(trip.id)) {
+      return false;
+    }
+
+    seen.add(trip.id);
+    return true;
+  });
 }
 
 async function ensureWanderlogAppTab({ background }) {

@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.6.1 - 2026-05-02
+
+- Fixed the selected-text note **Load trips** action more thoroughly by supporting additional Wanderlog trip route shapes (`/plan`, `/view`, query-string trip IDs) and trip field names (`planId`, `planName`, `displayName`).
+- Added a direct authenticated trip API fallback from the service worker with short timeouts, so Reload can still do useful work when the Wanderlog page bridge has not populated cache yet.
+- Added a browser-level popup smoke test that loads the unpacked extension in Chromium, opens a mocked Wanderlog trip page, clicks the real **Load trips** button, and verifies the **Send to trip** dropdown is populated.
+- Ignored disposable browser test profiles generated during local verification.
+
 ## v0.6.0 - 2026-05-02
 
 - Fixed selected-text note trip loading by adding a page-context bridge that can read Wanderlog's live app state and fetch activity from `app.wanderlog.com`.

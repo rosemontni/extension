@@ -5,7 +5,7 @@
 # Wanderlog Notes Clipper
 
 [![CI](https://github.com/rosemontni/extension/actions/workflows/ci.yml/badge.svg)](https://github.com/rosemontni/extension/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-0.6.0-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.6.1-blue.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-Apache--2.0-green.svg)](LICENSE)
 [![Manifest V3](https://img.shields.io/badge/Chrome-Manifest%20V3-f6a03d.svg)](manifest.json)
 
@@ -97,7 +97,7 @@ npm test
 
 The check script validates the Manifest V3 metadata, required files, permissions, host permissions, version alignment, and JavaScript syntax across all extension scripts.
 
-CI runs the same validation on pushes to `main` and pull requests. The release workflow packages version tags like `v0.6.0` into a ZIP and uploads it to GitHub Releases.
+CI runs the same validation on pushes to `main` and pull requests. The release workflow packages version tags like `v0.6.1` into a ZIP and uploads it to GitHub Releases.
 
 ## Release Standard
 
