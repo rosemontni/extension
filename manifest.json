@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Wanderlog Notes Clipper",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "description": "Clip travel notes and prepare Wanderlog destination imports from selected text or pasted lists.",
   "homepage_url": "https://github.com/rosemontni/extension",
   "permissions": [

@@ -5,7 +5,7 @@
 # Wanderlog Notes Clipper
 
 [![CI](https://github.com/rosemontni/extension/actions/workflows/ci.yml/badge.svg)](https://github.com/rosemontni/extension/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-0.6.1-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.6.2-blue.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-Apache--2.0-green.svg)](LICENSE)
 [![Manifest V3](https://img.shields.io/badge/Chrome-Manifest%20V3-f6a03d.svg)](manifest.json)
 
@@ -73,7 +73,7 @@ After visiting app.wanderlog.com, the popup pre-populates the trip selector auto
 **For a bulk destination list:**
 
 1. Paste one destination per line into **Bulk destination importer**.
-2. Click **Preview list** to strip bullets, numbering, and duplicates.
+2. The preview and usable-count pill update as you type, stripping bullets, numbering, and duplicates automatically.
 3. Optionally click **Check matches** to verify Wanderlog geo coverage before sending.
 4. Pick a trip from the pre-populated dropdown.
 5. Click **Send to Wanderlog** — all previewed places are added to that trip's places directly.

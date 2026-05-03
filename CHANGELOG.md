@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.6.2 - 2026-05-03
+
+- Fixed the bulk destination importer so pasted destinations parse live while typing; the usable-count pill, duplicate preview, and Copy/Check controls now update immediately instead of waiting for **Preview list**.
+- Fixed importer Send button state so it only enables when both a trip is selected and at least one usable destination exists.
+- Expanded the browser-level popup smoke test to type into the real importer textarea, verify the live `2/3` count and duplicate row, and confirm Send stays disabled until a mocked trip is selected.
+
 ## v0.6.1 - 2026-05-02
 
 - Fixed the selected-text note **Load trips** action more thoroughly by supporting additional Wanderlog trip route shapes (`/plan`, `/view`, query-string trip IDs) and trip field names (`planId`, `planName`, `displayName`).

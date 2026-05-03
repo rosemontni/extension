@@ -68,6 +68,7 @@ let currentContext = {
 };
 let currentClip = null;
 let importItems = [];
+let importBusy = false;
 let recentImportedDestinations = [];
 
 init().catch((error) => {
@@ -115,11 +116,15 @@ cancelClipButton.addEventListener("click", async () => {
 });
 
 parseImportButton.addEventListener("click", () => {
-  parseImportPreview();
+  parseImportPreview({ silent: false });
 });
 
 checkImportButton.addEventListener("click", () => {
   checkImportMatches();
+});
+
+importText.addEventListener("input", () => {
+  parseImportPreview({ silent: true });
 });
 
 importLoadTripsButton.addEventListener("click", () => {
@@ -127,7 +132,7 @@ importLoadTripsButton.addEventListener("click", () => {
 });
 
 importTripSelect.addEventListener("change", () => {
-  sendImportButton.disabled = !importTripSelect.value;
+  updateImportActionStates();
 });
 
 sendImportButton.addEventListener("click", () => {
@@ -423,7 +428,7 @@ function buildClipFromForm() {
   };
 }
 
-async function parseImportPreview() {
+function parseImportPreview({ silent = false } = {}) {
   const parsed = parseDestinationList(importText.value, {
     existingDestinations: recentImportedDestinations,
     maxItems: MAX_IMPORT_DESTINATIONS
@@ -431,11 +436,15 @@ async function parseImportPreview() {
 
   importItems = parsed.items.map((item, index) => ({
     ...item,
-    id: `${Date.now()}-${index}`,
+    id: `${item.lineNumber}-${item.key || index}`,
     included: item.status !== "duplicate"
   }));
 
   renderImportPreview();
+
+  if (silent) {
+    return;
+  }
 
   if (!importItems.length) {
     importStatusText.textContent = "Paste one destination per line to preview an import.";
@@ -453,9 +462,7 @@ async function parseImportPreview() {
 function renderImportPreview() {
   const counts = getImportCounts(importItems);
   importCount.textContent = `${counts.usable}/${counts.total}`;
-  checkImportButton.disabled = counts.usable === 0;
-  sendImportButton.disabled = counts.usable === 0;
-  copyImportButton.disabled = counts.usable === 0;
+  updateImportActionStates();
 
   if (!importItems.length) {
     importList.innerHTML = "<li class=\"import-empty\">No destination preview yet.</li>";
@@ -494,7 +501,7 @@ function renderImportPreview() {
 
 async function checkImportMatches() {
   if (!importItems.length) {
-    await parseImportPreview();
+    parseImportPreview({ silent: false });
   }
 
   const candidates = importItems.filter(
@@ -677,10 +684,16 @@ function setButtonsDisabled(disabled) {
 }
 
 function setImportButtonsDisabled(disabled) {
+  importBusy = disabled;
   parseImportButton.disabled = disabled;
-  checkImportButton.disabled = disabled;
-  sendImportButton.disabled = disabled;
-  copyImportButton.disabled = disabled;
+  if (disabled) {
+    checkImportButton.disabled = true;
+    sendImportButton.disabled = true;
+    copyImportButton.disabled = true;
+    return;
+  }
+
+  updateImportActionStates();
 }
 
 function getSuccessMessage(kind, result) {
@@ -724,8 +737,7 @@ async function loadAndPopulateTripSelects({ userInitiated }) {
     sendToWanderlogButton.disabled = true;
 
     importTripSelect.innerHTML = options;
-    // Re-evaluate send button state based on current selection.
-    sendImportButton.disabled = !importTripSelect.value;
+    updateImportActionStates();
 
     if (userInitiated) {
       const label = `${trips.length} trip${trips.length === 1 ? "" : "s"} loaded.`;
@@ -749,6 +761,7 @@ async function loadAndPopulateTripSelects({ userInitiated }) {
     importLoadTripsButton.disabled = false;
     clipTripSelect.disabled = false;
     importTripSelect.disabled = false;
+    updateImportActionStates();
   }
 }
 
@@ -861,9 +874,19 @@ async function sendImportToWanderlog() {
     importStatusText.textContent = error.message || "Could not send destinations.";
   } finally {
     setImportButtonsDisabled(false);
+    updateImportActionStates();
   }
 }
 
 function openWanderlogApp() {
   chrome.tabs.create({ url: "https://app.wanderlog.com/", active: true });
+}
+
+function updateImportActionStates() {
+  const counts = getImportCounts(importItems);
+  const hasUsableItems = counts.usable > 0;
+
+  checkImportButton.disabled = importBusy || !hasUsableItems;
+  copyImportButton.disabled = importBusy || !hasUsableItems;
+  sendImportButton.disabled = importBusy || !hasUsableItems || !importTripSelect.value;
 }

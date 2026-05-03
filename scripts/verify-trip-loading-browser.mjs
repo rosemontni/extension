@@ -64,13 +64,60 @@ try {
     `async () => {
       const loadButton = document.getElementById("load-trips-button");
       const select = document.getElementById("clip-trip-select");
+      const importText = document.getElementById("import-text");
+      const importCount = document.getElementById("import-count");
+      const importList = document.getElementById("import-list");
+      const importSelect = document.getElementById("import-trip-select");
+      const checkImportButton = document.getElementById("check-import-button");
+      const copyImportButton = document.getElementById("copy-import-button");
+      const sendImportButton = document.getElementById("send-import-button");
       const status = document.getElementById("clip-status-text");
-      if (!loadButton || !select || !status) {
+      if (
+        !loadButton ||
+        !select ||
+        !status ||
+        !importText ||
+        !importCount ||
+        !importList ||
+        !importSelect ||
+        !checkImportButton ||
+        !copyImportButton ||
+        !sendImportButton
+      ) {
         return { ok: false, error: "Popup controls were not found." };
       }
 
       loadButton.click();
       await new Promise((resolve) => setTimeout(resolve, 3500));
+
+      const unique = String(Date.now()).slice(-6);
+      importText.value = [
+        "Codex Ridge " + unique,
+        "Mooncake Pier " + unique,
+        "Codex Ridge " + unique
+      ].join("\\n");
+      importText.dispatchEvent(new Event("input", { bubbles: true }));
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      const importerBeforeTrip = {
+        count: importCount.textContent,
+        items: [...importList.querySelectorAll(".import-item")].map((item) => ({
+          name: item.querySelector(".import-name")?.textContent || "",
+          status: item.querySelector(".status-pill")?.textContent || ""
+        })),
+        checkDisabled: checkImportButton.disabled,
+        copyDisabled: copyImportButton.disabled,
+        sendDisabled: sendImportButton.disabled
+      };
+
+      importSelect.value = "trip-api-1";
+      importSelect.dispatchEvent(new Event("change", { bubbles: true }));
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      const importerAfterTrip = {
+        tripValue: importSelect.value,
+        sendDisabled: sendImportButton.disabled
+      };
 
       return {
         ok: true,
@@ -80,14 +127,29 @@ try {
         options: [...select.options].map((option) => ({
           value: option.value,
           text: option.textContent
-        }))
+        })),
+        importerBeforeTrip,
+        importerAfterTrip
       };
     }`
   );
 
   const options = result?.options || [];
   const tripOptions = options.filter((option) => option.value);
-  const passed = result?.ok && tripOptions.some((option) => option.text === "Mock Tokyo Trip");
+  const importerItems = result?.importerBeforeTrip?.items || [];
+  const importerPassed =
+    result?.importerBeforeTrip?.count === "2/3" &&
+    importerItems.length === 3 &&
+    importerItems.some((item) => item.status === "Duplicate") &&
+    result?.importerBeforeTrip?.checkDisabled === false &&
+    result?.importerBeforeTrip?.copyDisabled === false &&
+    result?.importerBeforeTrip?.sendDisabled === true &&
+    result?.importerAfterTrip?.tripValue === "trip-api-1" &&
+    result?.importerAfterTrip?.sendDisabled === false;
+  const passed =
+    result?.ok &&
+    tripOptions.some((option) => option.text === "Mock Tokyo Trip") &&
+    importerPassed;
 
   console.log(JSON.stringify(
     {
